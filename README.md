@@ -49,7 +49,7 @@ M0 ~ M6 全部通过后，才称为 MVP。M7（AI 内容辅助）与 M8（模板
 
 ## 快速开始
 
-需要 Node.js 18 及以上。
+需要 Node.js 20.19+ 或 22.12+。
 
 ```bash
 npm install
