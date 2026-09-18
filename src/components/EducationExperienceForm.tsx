@@ -15,8 +15,8 @@ import styles from './EducationExperienceForm.module.css';
  * - 不自己取数（不读路由 / 不 import sampleResume / 不读存储）。
  * - 不做字段校验、不做日期格式化。时间是普通文本输入，用户可以填 `2018-09` 或 `至今`。
  * - 不是通用 Section 编辑器，也不是通用列表编辑器：只服务「教育经历」这一种 Section。
- *   本次刻意不与 WorkExperienceForm 合并成通用 ExperienceForm——
- *   现在只有一个稳定样本，还看不出哪些是真正的共性。重复代码是后续判断抽象的证据。
+ *   刻意不与 WorkExperienceForm 合并成通用 ExperienceForm——
+ *   M2 总验收后仍决定保持独立：字段语义不同，当前没有必要为了减少重复而建通用层。
  *
  * 唯一属于本组件的 UI 关注点是删除确认：删除整条教育经历需要用户确认，
  * 确认通过后才调用 onRemove。删除单条 bullet 不需要确认（依据 05 第 11 节）。

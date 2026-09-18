@@ -84,8 +84,8 @@ import styles from './EditorPage.module.css';
  *
  * 已知问题（记录，本阶段不处理）：
  * 四组 CRUD + 显隐接入后本文件持续变长：M2.4 为 354 行，M2.5 为 406 行，M2.6 后 441 行。
- * **行数本身不是重构触发条件**：是否值得拆出 hook / controller，
- * 等 M2 全部验收通过后单独按职责评估，
+ * **行数本身不是重构触发条件**：M2 总验收后仍决定保持各类型 CRUD 独立，
+ * 是否拆出 hook / controller 属于后续按职责单独评估的独立判断，
  * 不在任何单个任务里顺手做，也不因为「超过 400 行」就自动动手。
  */
 export default function EditorPage() {
@@ -199,8 +199,8 @@ export default function EditorPage() {
    *
    * 与上面的工作经历处理器同构，但刻意不复用同一个函数：
    * 两者的字段类型（WorkItemTextField / EducationItemTextField）与
-   * 更新函数不同，现在只有一个稳定样本，还看不出真正的共性在哪。
-   * 重复本身是后续判断抽象是否合理的证据。
+   * 更新函数不同。M2 总验收后仍决定保持各类型 CRUD 独立；
+   * 字段语义的差异说明当前没有必要为了减少重复而建立通用 CRUD 层。
    */
   const handleEducationAddItem = () => {
     setResume((current) => (current ? addEducationItem(current) : current));
@@ -251,8 +251,8 @@ export default function EditorPage() {
    *
    * 与上面的工作 / 教育处理器同构，但同样刻意不复用同一个函数：
    * 字段类型不同（ProjectItemTextField 只有 4 个字段，没有 city），
-   * 更新函数也不同。第二、第三个真实样本落地后，是否抽公共层属于
-   * M2 验收后的独立判断，不在本任务里顺手做。
+   * 更新函数也不同。第二、第三个真实样本落地后依然不抽公共层：
+   * M2 总验收后决定保持各类型 CRUD 独立。
    */
   const handleProjectAddItem = () => {
     setResume((current) => (current ? addProjectItem(current) : current));

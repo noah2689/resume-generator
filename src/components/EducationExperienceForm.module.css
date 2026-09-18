@@ -5,7 +5,7 @@
  * 与 BasicInfoForm / WorkExperienceForm 保持同一套视觉语言。
  *
  * 注意：这里是刻意复制 WorkExperienceForm.module.css 的样式，而不是抽出共享 CSS。
- * 两个表单的字段与语义不同，是否值得共享要等 M2 走完再判断；
+ * 两个表单的字段与语义不同，M2 总验收后仍决定不共享；
  * 现在共享会让两处被隐式绑在一起，改一个动两个。重复是可接受的成本。
  */
 

@@ -269,7 +269,7 @@ Next.js、Redux、Zustand、Tailwind、shadcn/ui、Material UI / Ant Design、�
 - `EditorPage` 持有 `Resume` 状态并负责布局（不拆 Context / store / reducer）。
 - `BasicInfoForm` 只负责受控输入与回调，**不持有 Resume 状态、不自己取数、不做校验**，也不是通用表单系统（没有字段注册表、没有 schema 驱动渲染）。
 - `WorkExperienceForm` 同样只负责受控输入与回调，本轮只覆盖工作经历；它不知道数据从哪来、也不做校验，更不是通用的「Section 编辑器」。
-- `EducationExperienceForm` 与 `WorkExperienceForm` 是两套独立实现，没有抽公共组件：职责边界相同（受控输入 + 回调，不持有状态、不取数、不校验），但字段与语义不同。是否值得共用要等 M2 走完再判断。
+- `EducationExperienceForm` 与 `WorkExperienceForm` 是两套独立实现，没有抽公共组件：职责边界相同（受控输入 + 回调，不持有状态、不取数、不校验），但字段与语义不同。M2 总验收后仍维持两套独立实现，不合并（理由见下方第 7 条决策）。
 - `ProjectExperienceForm` 与前两个同理，是第三套独立实现。字段更少（无城市），进一步说明三类并不完全同构。
 - `SkillsForm` 是第一个**异形**实现：`SkillItem` 只有 `name` / `level` 两个字符串，没有 description 数组，因此它没有描述要点区块，也**没有删除确认**（05 第 11 节的删除保护只针对工作经历、项目经历这类重要内容）。它是全部四个表单中最短的一个。
 - `workEdits.ts` / `educationEdits.ts` / `projectEdits.ts` / `skillsEdits.ts` 都是无状态纯函数：`(Resume, 定位参数) → 新的 Resume`。只在找不到目标时原样返回传入的 `Resume`，绝不读写外部状态、不做 IO，也不承担持久化。四者刻意不共享代码。
@@ -357,7 +357,7 @@ export type ResumeSection =
 
 这不是遗漏，是有意为之。三类经历有结构共性（「按 id 定位单条并写回四层嵌套」与「列表 + bullet 的受控编辑」），但差异也是实的：work 是 公司 / 职位，education 是 学校 / 专业 / 学历，project 是 项目名称 / 角色且**没有城市**。字段集合连长度都不一致，说明它们不是同一个形状。技能更进一步：`SkillItem` 只有两个字符串字段，连 description 层都没有。
 
-按 06 第 5 节的复杂度预算，抽象需要至少 2～3 个真实复用场景。现在四类 Section 的真实编辑形状都已出现，但 M2 本身还没走完：此时抽取通用层，收益主要仍是减少重复代码，而会提前绑定已经验收的实现——**先把重复留着，等 M2 全部 CRUD + 显示隐藏都验收通过后，再单独评估该抽哪一层**。届时重复代码本身就是判断依据。
+按 06 第 5 节的复杂度预算，抽象需要至少 2～3 个真实复用场景。四类 Section 的真实编辑形状现在都已出现，M2 也已完成并通过总验收。**经过四类真实 CRUD 实现后，目前仍不为了减少行数而合并成通用 CRUD / ExperienceForm；现有重复保持可控。后续只有出现真实的跨类型共同修改需求时，再重新评估公共层。**重复代码本身就是判断依据。
 
 这条决策与第 1 条（内容与模板分离）方向一致：两者都在避免「为了未来的可能需求，提前制造耦合」。
 
