@@ -1,0 +1,7 @@
+node_modules
+dist
+.DS_Store
+*.local
+
+# WorkBuddy 工具本地状态目录，不属于项目资产
+.workbuddy/
