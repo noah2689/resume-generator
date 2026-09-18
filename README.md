@@ -14,7 +14,7 @@
 | --- | --- | --- |
 | M0 | 项目骨架 | **已完成** |
 | M1 | 单模板只读预览（简约单栏） | **已完成** |
-| M2 | 内容编辑 | **进行中**（基本信息 + 四类 CRUD 已完成；待 Section 显隐） |
+| M2 | 内容编辑 | **已完成** |
 | M3 | 保存与恢复 | 未开始 |
 | M4 | 模板切换（共 3 个模板） | 未开始 |
 | M5 | 基础样式（主题色 / 字体 / 密度 / 头像） | 未开始 |
@@ -22,7 +22,7 @@
 
 M0 ~ M6 全部通过后，才称为 MVP。M7（AI 内容辅助）与 M8（模板扩展）在 MVP 之后。
 
-> M2 尚未通过验收。基本信息与教育 / 工作 / 项目 / 技能 CRUD 已完成，目前仅剩 Section 显示 / 隐藏。
+> M2 已通过验收：基本信息可编辑，教育 / 工作 / 项目 / 技能四类内容可增删改，每个模块可单独显示或隐藏，所有改动实时反映在右侧预览上。仍然没有保存——刷新会回到示例数据，这属于 M3。
 
 ### M0 交付了什么
 
@@ -128,15 +128,15 @@ EditorPage 的 resume state
 
 以下均为后续阶段内容，当前不存在：
 
-- Section 显示 / 隐藏开关（M2 剩余部分）
 - 数据保存（LocalStorage / 数据库），刷新后数据会丢（M3）
 - 模板切换、模板选择页、第二个模板（M4）
 - 右侧样式设置栏、主题色 / 字体 / 密度的切换能力（M5）
 - PDF 导出、分页边界（M6）
+- Section 排序、Section 新增 / 删除
 - AI 功能、登录、首页视觉设计
 - 通用 Section 编辑器 / 通用 ExperienceForm（见决策第 7 条，当前刻意不做）
 
-编辑器页当前能做的事有六件：**读取示例数据渲染 A4 预览**、**编辑 5 个基本信息字段**、**增删改工作经历 / 教育经历 / 项目经历（各含每条描述）**、**增删改技能**，所有改动实时反映在右侧预览上。它仍然没有 Section 显示隐藏、没有样式设置、没有保存。
+编辑器页当前能做的事有七件：**读取示例数据渲染 A4 预览**、**编辑 5 个基本信息字段**、**增删改工作经历 / 教育经历 / 项目经历（各含每条描述）**、**增删改技能**、**单独显示 / 隐藏任一内容模块**，所有改动实时反映在右侧预览上。它仍然没有样式设置、没有保存。
 
 ---
 
@@ -241,10 +241,13 @@ Next.js、Redux、Zustand、Tailwind、shadcn/ui、Material UI / Ant Design、�
     │   ├── workEdits.ts      工作经历不可变更新纯函数（只处理 work Section）
     │   ├── educationEdits.ts 教育经历不可变更新纯函数（只处理 education Section）
     │   ├── projectEdits.ts   项目经历不可变更新纯函数（只处理 project Section）
-    │   └── skillsEdits.ts    技能不可变更新纯函数（只处理 skills Section）
+    │   ├── skillsEdits.ts    技能不可变更新纯函数（只处理 skills Section）
+    │   └── sectionVisibility.ts  Section 显隐纯函数（只改 Section 外壳的 visible）
     ├── components/           可复用 UI 组件
     │   ├── BasicInfoForm.tsx
     │   ├── BasicInfoForm.module.css
+    │   ├── SectionVisibilityControls.tsx
+    │   ├── SectionVisibilityControls.module.css
     │   ├── WorkExperienceForm.tsx
     │   ├── WorkExperienceForm.module.css
     │   ├── EducationExperienceForm.tsx
@@ -270,7 +273,9 @@ Next.js、Redux、Zustand、Tailwind、shadcn/ui、Material UI / Ant Design、�
 - `ProjectExperienceForm` 与前两个同理，是第三套独立实现。字段更少（无城市），进一步说明三类并不完全同构。
 - `SkillsForm` 是第一个**异形**实现：`SkillItem` 只有 `name` / `level` 两个字符串，没有 description 数组，因此它没有描述要点区块，也**没有删除确认**（05 第 11 节的删除保护只针对工作经历、项目经历这类重要内容）。它是全部四个表单中最短的一个。
 - `workEdits.ts` / `educationEdits.ts` / `projectEdits.ts` / `skillsEdits.ts` 都是无状态纯函数：`(Resume, 定位参数) → 新的 Resume`。只在找不到目标时原样返回传入的 `Resume`，绝不读写外部状态、不做 IO，也不承担持久化。四者刻意不共享代码。
-- `SimpleSingleColumn`（模板）只通过 props 接收数据并渲染，不知道编辑器的存在。
+- `sectionVisibility.ts` 是唯一一个**真正通用**的 Section 操作：`visible` 是 `SectionBase` 上真实定义的字段，四类 Section 都拥有它，所以一个 `setSectionVisible(resume, sectionId, visible)` 覆盖全部四类，不需要 `type` 参数、不需要按类型分家（不存在 `setWorkVisible` 这类函数）。通用性来自 Schema 已经先统一了，不是来自"四个 CRUD 看起来像"。
+- `SectionVisibilityControls` 只依赖 `SectionBase` 共有的 `id` / `title` / `visible`，按传入的 `sections` 顺序渲染，标题直接取 `section.title`（没有 type → 中文名的映射表，也没有写死四个固定项）。
+- `SimpleSingleColumn`（模板）只通过 props 接收数据并渲染，不知道编辑器的存在。`visible` 过滤与空 Section 隐藏都是它 M1 就有的行为——M2.6 没有改模板一行，只是接通了「勾选框 → state → 模板」这条链路。
 
 路由：
 

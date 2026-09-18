@@ -5,6 +5,7 @@ import BasicInfoForm, {
 } from '../components/BasicInfoForm';
 import EducationExperienceForm from '../components/EducationExperienceForm';
 import ProjectExperienceForm from '../components/ProjectExperienceForm';
+import SectionVisibilityControls from '../components/SectionVisibilityControls';
 import SkillsForm from '../components/SkillsForm';
 import WorkExperienceForm from '../components/WorkExperienceForm';
 import { sampleResume } from '../data/sampleResume';
@@ -28,6 +29,7 @@ import {
   updateProjectItem,
   type ProjectItemTextField,
 } from './projectEdits';
+import { setSectionVisible } from './sectionVisibility';
 import {
   addSkillItem,
   removeSkillItem,
@@ -53,7 +55,8 @@ import styles from './EditorPage.module.css';
  * M2.3 阶段：加入教育经历 CRUD。
  * M2.4 阶段：加入项目经历 CRUD。
  * M2.5 阶段：加入技能 CRUD。
- * - 左侧：基本信息 + 工作经历 + 教育经历 + 项目经历 + 技能 五块表单
+ * M2.6 阶段：加入 Section 显示 / 隐藏。
+ * - 左侧：模块显示 + 基本信息 + 工作经历 + 教育经历 + 项目经历 + 技能
  * - 右侧：A4 简历预览
  *
  * 数据流：
@@ -62,6 +65,7 @@ import styles from './EditorPage.module.css';
  *       ↓ 初始化
  *   EditorPage resume state
  *       ├── 左侧 BasicInfoForm 修改 profile / targetRole
+ *       ├── 左侧 SectionVisibilityControls 修改各 Section 的 visible
  *       ├── 左侧 WorkExperienceForm 修改 work section 的 items
  *       ├── 左侧 EducationExperienceForm 修改 education section 的 items
  *       ├── 左侧 ProjectExperienceForm 修改 project section 的 items
@@ -72,15 +76,17 @@ import styles from './EditorPage.module.css';
  * - 本页持有 Resume 状态（不拆 Context / store / reducer），并负责布局。
  * - 各 Section 的嵌套不可变更新分别实现在 ./workEdits / ./educationEdits / ./projectEdits / ./skillsEdits，
  *   本页只做「把 state 传进去、把结果存回来」。四者刻意不合并成通用 CRUD 层。
+ * - Section 显隐实现在 ./sectionVisibility：它只改 Section 外壳的 visible，
+ *   与四套 item CRUD 是不同层次的东西，因此不放进任何一个 edits 文件。
  * - 简历纸面与排版属于模板组件。
- * - Section 显示隐藏与排序属于后续阶段。
+ * - Section 排序属于后续阶段。
  * - 本阶段没有持久化：刷新后回到示例数据是正确行为。
  *
  * 已知问题（记录，本阶段不处理）：
- * 四组 CRUD 接入后本文件持续变长：M2.4 为 354 行，M2.5 后 406 行、含五块表单。
+ * 四组 CRUD + 显隐接入后本文件持续变长：M2.4 为 354 行，M2.5 为 406 行，M2.6 后 441 行。
  * **行数本身不是重构触发条件**：是否值得拆出 hook / controller，
- * 等 M2 全部验收通过（含 Section 显隐）后单独按职责评估，
- * 不在任何单个 CRUD 任务里顺手做，也不因为「超过 400 行」就自动动手。
+ * 等 M2 全部验收通过后单独按职责评估，
+ * 不在任何单个任务里顺手做，也不因为「超过 400 行」就自动动手。
  */
 export default function EditorPage() {
   const { resumeId } = useParams<{ resumeId: string }>();
@@ -317,8 +323,30 @@ export default function EditorPage() {
     );
   };
 
+  /**
+   * 切换某个 Section 是否显示。
+   *
+   * 这是本页唯一的 Section 外壳级 Handler：它改的是 section.visible，
+   * 不碰 items。所以不需要按类型分四个 —— visible 是四类 Section 共有的字段，
+   * setSectionVisible 一个函数就够（理由见 sectionVisibility.ts 顶部）。
+   *
+   * 隐藏某个 Section 不会影响上面那些内容 Form：它们都基于
+   * resume.sections.find(...) 取数，本来就不看 visible，
+   * 所以「隐藏 ≠ 从编辑器删除」，用户仍可继续编辑、增删条目。
+   */
+  const handleSectionVisibilityChange = (
+    sectionId: string,
+    visible: boolean,
+  ) => {
+    setResume((current) =>
+      current ? setSectionVisible(current, sectionId, visible) : current,
+    );
+  };
+
   // 只读地用一下各 section：有就渲染表单，没有就显示提示。
   // 这里不创建 Section——Section 的新增 / 删除属于之后的任务。
+  // 注意：这些查找**不看 visible**。隐藏只影响右侧输出，
+  // 左侧编辑入口必须保留，否则用户会以为内容被删除了。
   const workSection = resume.sections.find((section) => section.type === 'work');
   const educationSection = resume.sections.find(
     (section) => section.type === 'education',
@@ -337,6 +365,13 @@ export default function EditorPage() {
           profile={resume.profile}
           targetRole={resume.targetRole}
           onChange={handleBasicInfoChange}
+        />
+
+        {/* 模块显示放在基本信息之后、四类内容表单之前：
+            先决定「这份简历要不要这一块」，再往下编辑具体内容。 */}
+        <SectionVisibilityControls
+          sections={resume.sections}
+          onChange={handleSectionVisibilityChange}
         />
 
         {workSection ? (

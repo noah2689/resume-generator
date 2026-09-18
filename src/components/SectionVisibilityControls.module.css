@@ -1,0 +1,51 @@
+/**
+ * 模块显示 / 隐藏控件样式
+ *
+ * 只负责控件自身的呈现，布局归属（宽度、位置）由页面控制。
+ * 与其它表单保持同一套视觉语言（同一套 CSS 变量、同样的圆角与字号）。
+ *
+ * 说明：这里是复制已有表单的样式结构，而不是抽共享 CSS。
+ * CSS Module 已做文件级隔离，所以继续沿用 .wrapper / .title 这类局部语义 class。
+ */
+
+.wrapper {
+  padding: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.title {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+/* 一行 = 一个 checkbox + 它的标签。整行可点，扩大点击区域。 */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.checkbox {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.label {
+  font-size: 13px;
+  color: var(--color-text);
+  cursor: pointer;
+}
