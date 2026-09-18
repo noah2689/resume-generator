@@ -5,6 +5,7 @@ import BasicInfoForm, {
 } from '../components/BasicInfoForm';
 import EducationExperienceForm from '../components/EducationExperienceForm';
 import ProjectExperienceForm from '../components/ProjectExperienceForm';
+import SkillsForm from '../components/SkillsForm';
 import WorkExperienceForm from '../components/WorkExperienceForm';
 import { sampleResume } from '../data/sampleResume';
 import SimpleSingleColumn from '../templates/SimpleSingleColumn';
@@ -28,6 +29,12 @@ import {
   type ProjectItemTextField,
 } from './projectEdits';
 import {
+  addSkillItem,
+  removeSkillItem,
+  updateSkillItem,
+  type SkillItemTextField,
+} from './skillsEdits';
+import {
   addWorkBullet,
   addWorkItem,
   removeWorkBullet,
@@ -45,7 +52,8 @@ import styles from './EditorPage.module.css';
  * M2.2 阶段：在此基础上支持工作经历 CRUD。
  * M2.3 阶段：加入教育经历 CRUD。
  * M2.4 阶段：加入项目经历 CRUD。
- * - 左侧：基本信息 + 工作经历 + 教育经历 + 项目经历 四块表单
+ * M2.5 阶段：加入技能 CRUD。
+ * - 左侧：基本信息 + 工作经历 + 教育经历 + 项目经历 + 技能 五块表单
  * - 右侧：A4 简历预览
  *
  * 数据流：
@@ -57,19 +65,22 @@ import styles from './EditorPage.module.css';
  *       ├── 左侧 WorkExperienceForm 修改 work section 的 items
  *       ├── 左侧 EducationExperienceForm 修改 education section 的 items
  *       ├── 左侧 ProjectExperienceForm 修改 project section 的 items
+ *       ├── 左侧 SkillsForm 修改 skills section 的 items
  *       └── 右侧 SimpleSingleColumn(resume)
  *
  * 职责边界：
  * - 本页持有 Resume 状态（不拆 Context / store / reducer），并负责布局。
- * - 各 Section 的嵌套不可变更新分别实现在 ./workEdits / ./educationEdits / ./projectEdits，
- *   本页只做「把 state 传进去、把结果存回来」。三者刻意不合并成通用 CRUD 层。
+ * - 各 Section 的嵌套不可变更新分别实现在 ./workEdits / ./educationEdits / ./projectEdits / ./skillsEdits，
+ *   本页只做「把 state 传进去、把结果存回来」。四者刻意不合并成通用 CRUD 层。
  * - 简历纸面与排版属于模板组件。
- * - 技能编辑、Section 显示隐藏与排序属于后续阶段。
+ * - Section 显示隐藏与排序属于后续阶段。
  * - 本阶段没有持久化：刷新后回到示例数据是正确行为。
  *
  * 已知问题（记录，本阶段不处理）：
- * 三组 CRUD 接入后本文件持续变长。是否值得拆出 hook / controller，
- * 等 M2 全部验收通过后单独评估，不在任何单个 CRUD 任务里顺手做。
+ * 四组 CRUD 接入后本文件持续变长：M2.4 为 354 行，M2.5 后 406 行、含五块表单。
+ * **行数本身不是重构触发条件**：是否值得拆出 hook / controller，
+ * 等 M2 全部验收通过（含 Section 显隐）后单独按职责评估，
+ * 不在任何单个 CRUD 任务里顺手做，也不因为「超过 400 行」就自动动手。
  */
 export default function EditorPage() {
   const { resumeId } = useParams<{ resumeId: string }>();
@@ -279,6 +290,33 @@ export default function EditorPage() {
     );
   };
 
+  /**
+   * 以下 3 个处理器是技能的唯一写入口。
+   *
+   * 只有 3 个而不是 6 个：SkillItem 只有 name / level 两个字段，
+   * 没有 description 数组，因此不存在 bullet 相关的处理器。
+   * 删除单条技能不需要确认（05 第 11 节），所以也没有确认逻辑要放进来。
+   */
+  const handleSkillAddItem = () => {
+    setResume((current) => (current ? addSkillItem(current) : current));
+  };
+
+  const handleSkillChangeField = (
+    itemId: string,
+    field: SkillItemTextField,
+    value: string,
+  ) => {
+    setResume((current) =>
+      current ? updateSkillItem(current, itemId, field, value) : current,
+    );
+  };
+
+  const handleSkillRemoveItem = (itemId: string) => {
+    setResume((current) =>
+      current ? removeSkillItem(current, itemId) : current,
+    );
+  };
+
   // 只读地用一下各 section：有就渲染表单，没有就显示提示。
   // 这里不创建 Section——Section 的新增 / 删除属于之后的任务。
   const workSection = resume.sections.find((section) => section.type === 'work');
@@ -287,6 +325,9 @@ export default function EditorPage() {
   );
   const projectSection = resume.sections.find(
     (section) => section.type === 'project',
+  );
+  const skillsSection = resume.sections.find(
+    (section) => section.type === 'skills',
   );
 
   return (
@@ -338,6 +379,17 @@ export default function EditorPage() {
           />
         ) : (
           <p className={styles.missingSection}>当前简历没有项目经历模块。</p>
+        )}
+
+        {skillsSection ? (
+          <SkillsForm
+            items={skillsSection.items}
+            onAddItem={handleSkillAddItem}
+            onChangeField={handleSkillChangeField}
+            onRemoveItem={handleSkillRemoveItem}
+          />
+        ) : (
+          <p className={styles.missingSection}>当前简历没有技能模块。</p>
         )}
       </aside>
 

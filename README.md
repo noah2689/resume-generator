@@ -14,7 +14,7 @@
 | --- | --- | --- |
 | M0 | 项目骨架 | **已完成** |
 | M1 | 单模板只读预览（简约单栏） | **已完成** |
-| M2 | 内容编辑 | **进行中**（已完成 M2.1 基本信息 + M2.2 工作经历 + M2.3 教育经历 + M2.4 项目经历） |
+| M2 | 内容编辑 | **进行中**（基本信息 + 四类 CRUD 已完成；待 Section 显隐） |
 | M3 | 保存与恢复 | 未开始 |
 | M4 | 模板切换（共 3 个模板） | 未开始 |
 | M5 | 基础样式（主题色 / 字体 / 密度 / 头像） | 未开始 |
@@ -22,7 +22,7 @@
 
 M0 ~ M6 全部通过后，才称为 MVP。M7（AI 内容辅助）与 M8（模板扩展）在 MVP 之后。
 
-> M2 尚未通过验收。M2 的完整验收标准是「新增一条工作经历后预览立即出现、删除后预览消失」，需要教育 / 工作 / 项目 / 技能四类 CRUD 与 Section 显示隐藏，目前完成了基本信息编辑、工作经历 / 教育经历 / 项目经历 CRUD，技能 CRUD 与显示隐藏尚未开始。
+> M2 尚未通过验收。基本信息与教育 / 工作 / 项目 / 技能 CRUD 已完成，目前仅剩 Section 显示 / 隐藏。
 
 ### M0 交付了什么
 
@@ -128,7 +128,6 @@ EditorPage 的 resume state
 
 以下均为后续阶段内容，当前不存在：
 
-- 技能的增删改（M2 剩余部分）
 - Section 显示 / 隐藏开关（M2 剩余部分）
 - 数据保存（LocalStorage / 数据库），刷新后数据会丢（M3）
 - 模板切换、模板选择页、第二个模板（M4）
@@ -137,7 +136,7 @@ EditorPage 的 resume state
 - AI 功能、登录、首页视觉设计
 - 通用 Section 编辑器 / 通用 ExperienceForm（见决策第 7 条，当前刻意不做）
 
-编辑器页当前能做的事有五件：**读取示例数据渲染 A4 预览**、**编辑 5 个基本信息字段**、**增删改工作经历 / 教育经历 / 项目经历（各含每条描述）**，所有改动实时反映在右侧预览上。它仍然没有技能编辑、没有 Section 显示隐藏、没有样式设置、没有保存。
+编辑器页当前能做的事有六件：**读取示例数据渲染 A4 预览**、**编辑 5 个基本信息字段**、**增删改工作经历 / 教育经历 / 项目经历（各含每条描述）**、**增删改技能**，所有改动实时反映在右侧预览上。它仍然没有 Section 显示隐藏、没有样式设置、没有保存。
 
 ---
 
@@ -241,7 +240,8 @@ Next.js、Redux、Zustand、Tailwind、shadcn/ui、Material UI / Ant Design、�
     │   ├── EditorPage.tsx    编辑器：持有 Resume state + 两栏布局
     │   ├── workEdits.ts      工作经历不可变更新纯函数（只处理 work Section）
     │   ├── educationEdits.ts 教育经历不可变更新纯函数（只处理 education Section）
-    │   └── projectEdits.ts   项目经历不可变更新纯函数（只处理 project Section）
+    │   ├── projectEdits.ts   项目经历不可变更新纯函数（只处理 project Section）
+    │   └── skillsEdits.ts    技能不可变更新纯函数（只处理 skills Section）
     ├── components/           可复用 UI 组件
     │   ├── BasicInfoForm.tsx
     │   ├── BasicInfoForm.module.css
@@ -250,7 +250,9 @@ Next.js、Redux、Zustand、Tailwind、shadcn/ui、Material UI / Ant Design、�
     │   ├── EducationExperienceForm.tsx
     │   ├── EducationExperienceForm.module.css
     │   ├── ProjectExperienceForm.tsx
-    │   └── ProjectExperienceForm.module.css
+    │   ├── ProjectExperienceForm.module.css
+    │   ├── SkillsForm.tsx
+    │   └── SkillsForm.module.css
     ├── templates/            简历模板（只接收数据，负责排版）
     │   ├── SimpleSingleColumn.tsx
     │   └── SimpleSingleColumn.module.css
@@ -266,7 +268,8 @@ Next.js、Redux、Zustand、Tailwind、shadcn/ui、Material UI / Ant Design、�
 - `WorkExperienceForm` 同样只负责受控输入与回调，本轮只覆盖工作经历；它不知道数据从哪来、也不做校验，更不是通用的「Section 编辑器」。
 - `EducationExperienceForm` 与 `WorkExperienceForm` 是两套独立实现，没有抽公共组件：职责边界相同（受控输入 + 回调，不持有状态、不取数、不校验），但字段与语义不同。是否值得共用要等 M2 走完再判断。
 - `ProjectExperienceForm` 与前两个同理，是第三套独立实现。字段更少（无城市），进一步说明三类并不完全同构。
-- `workEdits.ts` / `educationEdits.ts` / `projectEdits.ts` 都是无状态纯函数：`(Resume, 定位参数) → 新的 Resume`。只在找不到目标时原样返回传入的 `Resume`，绝不读写外部状态、不做 IO，也不承担持久化。三者刻意不共享代码。
+- `SkillsForm` 是第一个**异形**实现：`SkillItem` 只有 `name` / `level` 两个字符串，没有 description 数组，因此它没有描述要点区块，也**没有删除确认**（05 第 11 节的删除保护只针对工作经历、项目经历这类重要内容）。它是全部四个表单中最短的一个。
+- `workEdits.ts` / `educationEdits.ts` / `projectEdits.ts` / `skillsEdits.ts` 都是无状态纯函数：`(Resume, 定位参数) → 新的 Resume`。只在找不到目标时原样返回传入的 `Resume`，绝不读写外部状态、不做 IO，也不承担持久化。四者刻意不共享代码。
 - `SimpleSingleColumn`（模板）只通过 props 接收数据并渲染，不知道编辑器的存在。
 
 路由：
@@ -341,15 +344,15 @@ export type ResumeSection =
 
 ### 7. 重复优先于过早抽象
 
-工作经历（M2.2）、教育经历（M2.3）与项目经历（M2.4）的编辑能力高度相似，但代码是**三套独立实现**，没有合并：
+工作经历（M2.2）、教育经历（M2.3）与项目经历（M2.4）的编辑能力高度相似，但代码是**三套独立实现**，没有合并；技能（M2.5）也是独立一套，而它本身形状就更简单。
 
-- 数据层：`workEdits.ts` / `educationEdits.ts` / `projectEdits.ts` 各自持有查找 / 写回与定位 helper，互不复用
-- UI 层：三个 Form 各自持有字段表与删除文案，CSS Module 也是各自一份
-- 编辑页：三组 6 个处理器分列，签名不同（`WorkItemTextField` / `EducationItemTextField` / `ProjectItemTextField`）
+- 数据层：`workEdits.ts` / `educationEdits.ts` / `projectEdits.ts` / `skillsEdits.ts` 各自持有查找 / 写回与定位 helper，互不复用
+- UI 层：四个 Form 各自持有字段表，CSS Module 也是各自一份；前三个还各自持有删除文案，`SkillsForm` 没有（删除技能不需要确认），也是四个里最短的一个
+- 编辑页：前三组各 6 个处理器分列，技能只有 3 个，签名不同（`WorkItemTextField` / `EducationItemTextField` / `ProjectItemTextField` / `SkillItemTextField`）
 
-这不是遗漏，是有意为之。三者有结构共性（「按 id 定位单条并写回四层嵌套」与「列表 + bullet 的受控编辑」），但差异也是实的：work 是 公司 / 职位，education 是 学校 / 专业 / 学历，project 是 项目名称 / 角色且**没有城市**。字段集合连长度都不一致，说明它们不是同一个形状。
+这不是遗漏，是有意为之。三类经历有结构共性（「按 id 定位单条并写回四层嵌套」与「列表 + bullet 的受控编辑」），但差异也是实的：work 是 公司 / 职位，education 是 学校 / 专业 / 学历，project 是 项目名称 / 角色且**没有城市**。字段集合连长度都不一致，说明它们不是同一个形状。技能更进一步：`SkillItem` 只有两个字符串字段，连 description 层都没有。
 
-按 06 第 5 节的复杂度预算，抽象需要至少 2～3 个真实复用场景。现在三个样本都在手上，但 M2 本身还没走完：此时抽取通用层，会让四处代码（含尚未开始的技能）被隐式绑定，而收益主要是省行数——**先把重复留着，等 M2 全部四类 CRUD + 显示隐藏都验收通过后，再单独评估该抽哪一层**。届时重复代码本身就是判断依据。
+按 06 第 5 节的复杂度预算，抽象需要至少 2～3 个真实复用场景。现在四类 Section 的真实编辑形状都已出现，但 M2 本身还没走完：此时抽取通用层，收益主要仍是减少重复代码，而会提前绑定已经验收的实现——**先把重复留着，等 M2 全部 CRUD + 显示隐藏都验收通过后，再单独评估该抽哪一层**。届时重复代码本身就是判断依据。
 
 这条决策与第 1 条（内容与模板分离）方向一致：两者都在避免「为了未来的可能需求，提前制造耦合」。
 

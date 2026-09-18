@@ -1,0 +1,122 @@
+/**
+ * 技能表单样式
+ *
+ * 只负责表单自身的呈现，布局归属（宽度、位置）由页面控制。
+ * 与 BasicInfoForm / WorkExperienceForm / EducationExperienceForm / ProjectExperienceForm
+ * 保持同一套视觉语言。
+ *
+ * 说明：这里是复制已有表单的样式结构，而不是抽共享 CSS。
+ * CSS Module 本身已做文件级隔离，所以继续沿用 .wrapper / .item / .field 这类
+ * 局部语义 class 即可。但也不共享同一份 Module：四个表单各自独立，改一个不影响另一个。
+ *
+ * 本文件明显比前三个表单的 CSS 短：没有描述要点区块
+ * （bulletsBlock / bulletsTitle / bulletRow / bulletInput / bulletRemove / addBullet）。
+ */
+
+.wrapper {
+  padding: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.title {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.empty {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+/* 每条技能。用分隔线而不是卡片嵌套，避免左栏视觉过重。 */
+.item {
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px dashed var(--color-border);
+}
+
+/* 技能名称与熟练度并排：两项都短，横排比上下堆叠更省左栏高度。 */
+.fields {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.field {
+  min-width: 0;
+}
+
+.fieldName {
+  flex: 1 1 60%;
+}
+
+.fieldLevel {
+  flex: 1 1 40%;
+}
+
+.label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: #ffffff;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.input:focus {
+  border-color: var(--color-text-muted);
+  outline: none;
+}
+
+/* 删除单条技能不需要二次确认，所以按钮直接触发删除。 */
+.removeItem {
+  margin-top: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.removeItem:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+/* 新增按钮：整块压在表单最下方，与条目之间有明确分隔。 */
+.addItem {
+  display: block;
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px dashed var(--color-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.addItem:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
