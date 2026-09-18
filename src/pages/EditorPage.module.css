@@ -1,109 +1,24 @@
-.wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  max-width: 880px;
+/**
+ * 页面：简历编辑器 —— 外层舞台样式
+ *
+ * 只负责把模板渲染出的 A4 纸面居中摆放。
+ * 纸面尺寸、内边距、内容排版全部在模板自己的样式里。
+ *
+ * 未找到简历时的错误状态使用 global.css 中的 .panel 样式，不在此处定义。
+ */
+
+.stage {
+  /* 纸面比容器宽时允许横向滚动，而不是把纸面压窄。 */
+  overflow-x: auto;
+  padding-bottom: 32px;
 }
 
-.notice {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px 16px;
-  background: var(--color-dev-bg);
-  border: 1px solid var(--color-dev-border);
-  border-radius: 8px;
-  color: #7a5b12;
-}
-
-.notice strong {
-  font-weight: 500;
-}
-
-.card {
-  padding: 16px 20px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-}
-
-.cardTitle {
-  margin: 0 0 12px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-text-muted);
-}
-
-.fieldList {
-  display: grid;
-  grid-template-columns: 140px 1fr;
-  gap: 6px 16px;
-  margin: 0;
-}
-
-.fieldLabel {
-  color: var(--color-text-muted);
-  font-family: var(--font-mono);
-  font-size: 12px;
-}
-
-.fieldValue,
-.fieldValueStrong {
-  margin: 0;
-  word-break: break-all;
-}
-
-.fieldValueStrong {
-  font-weight: 500;
-}
-
-.sectionList {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.sectionItem {
-  padding: 12px 16px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-}
-
-.sectionHeader {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.sectionTitle {
-  font-weight: 500;
-}
-
-.badge {
-  padding: 1px 8px;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--color-text-muted);
-}
-
-.meta {
-  font-size: 12px;
-  color: var(--color-text-muted);
-}
-
-.itemList {
-  margin: 8px 0 0;
-  padding-left: 18px;
-  color: var(--color-text-muted);
-}
-
-.item {
-  font-size: 13px;
+/*
+ * 用 fit-content + auto margin 居中：
+ * 容器够宽时居中，容器不够宽时正常溢出并可横向滚动，
+ * 避免 flex 居中在溢出场景下裁掉左侧内容。
+ */
+.paperSlot {
+  width: fit-content;
+  margin: 0 auto;
 }
