@@ -300,7 +300,7 @@ Next.js、Redux、Zustand、Tailwind、shadcn/ui、Material UI / Ant Design、�
 | --- | --- | --- |
 | `/` | 我的简历 | 骨架 |
 | `/new` | 新建简历 | 骨架 |
-| `/editor/:resumeId` | 简历编辑器 | M3：基本信息 + 四类 Section 内容可编辑 + 实时预览，改动自动保存、刷新后恢复（无样式设置） |
+| `/editor/:resumeId` | 简历编辑器 | M4：内容可编辑 + 三模板切换 + 实时预览，改动自动保存、刷新后恢复（无样式设置） |
 
 ---
 
