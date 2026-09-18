@@ -16,7 +16,7 @@
 | M1 | 单模板只读预览（简约单栏） | **已完成** |
 | M2 | 内容编辑 | **已完成** |
 | M3 | 保存与恢复 | **已完成** |
-| M4 | 模板切换（共 3 个模板） | 未开始 |
+| M4 | 模板切换（共 3 个模板） | **已完成** |
 | M5 | 基础样式（主题色 / 字体 / 密度 / 头像） | 未开始 |
 | M6 | PDF 导出 | 未开始 |
 
@@ -25,6 +25,8 @@ M0 ~ M6 全部通过后，才称为 MVP。M7（AI 内容辅助）与 M8（模板
 > M2 已通过验收：基本信息可编辑，教育 / 工作 / 项目 / 技能四类内容可增删改，每个模块可单独显示或隐藏，所有改动实时反映在右侧预览上。M2 当时还没有保存——刷新会回到示例数据，保存与恢复在 M3 完成。
 >
 > M3 已通过验收：编辑后自动把整份 Resume 存进浏览器 LocalStorage，**刷新 / 重新打开后恢复**。没有数据、坏数据、`id` 不符或 `schemaVersion` 不符时，一律回退到示例数据，并且不会删除存储里的旧值。仍然没有后端、数据库与账号。
+>
+> M4 已通过验收：**同一份 Resume 可以在三个模板之间自由切换，内容完全不丢**。三个模板为简约单栏（`simple-single-column`）、商务单栏（`business-single-column`）、左右双栏（`two-column`），在编辑器右侧预览上方切换，切换后刷新仍然是所选模板。切换模板只改变 Resume 上的 `templateId` 这一个字段，不重建 `profile` / `sections` / `style`，也不按模板调整顺序或清理隐藏模块。仍然是「模板少而稳定」：没有缩略图、没有模板选择页、没有模板抽屉。
 
 ### M0 交付了什么
 
@@ -130,14 +132,14 @@ EditorPage 的 resume state
 
 以下均为后续阶段内容，当前不存在：
 
-- 模板切换、模板选择页、第二个模板（M4）
+- 模板选择页、模板缩略图、模板抽屉、超过三个模板、模板元数据 / 注册表系统（M8）
 - 右侧样式设置栏、主题色 / 字体 / 密度的切换能力（M5）
 - PDF 导出、分页边界（M6）
 - Section 排序、Section 新增 / 删除
 - AI 功能、登录、首页视觉设计
 - 通用 Section 编辑器 / 通用 ExperienceForm（见决策第 7 条，当前刻意不做）
 
-编辑器页当前能做的事有八件：**读取示例数据渲染 A4 预览**、**编辑 5 个基本信息字段**、**增删改工作经历 / 教育经历 / 项目经历（各含每条描述）**、**增删改技能**、**单独显示 / 隐藏任一内容模块**、**把改动自动存进浏览器、刷新后恢复**，所有改动实时反映在右侧预览上。它仍然没有样式设置。
+编辑器页当前能做的事有九件：**读取示例数据渲染 A4 预览**、**编辑 5 个基本信息字段**、**增删改工作经历 / 教育经历 / 项目经历（各含每条描述）**、**增删改技能**、**单独显示 / 隐藏任一内容模块**、**在三个模板之间切换**、**把改动自动存进浏览器、刷新后恢复**，所有改动实时反映在右侧预览上。它仍然没有样式设置。
 
 ---
 
@@ -259,10 +261,17 @@ Next.js、Redux、Zustand、Tailwind、shadcn/ui、Material UI / Ant Design、�
     │   ├── ProjectExperienceForm.tsx
     │   ├── ProjectExperienceForm.module.css
     │   ├── SkillsForm.tsx
-    │   └── SkillsForm.module.css
-    ├── templates/            简历模板（只接收数据，负责排版）
-    │   ├── SimpleSingleColumn.tsx
-    │   └── SimpleSingleColumn.module.css
+    │   ├── SkillsForm.module.css
+    │   ├── TemplateSwitcher.tsx         模板选择控件（受控 select，只改 templateId）
+    │   └── TemplateSwitcher.module.css
+    ├── templates/            简历模板与模板分发器（只接收数据，负责排版）
+    │   ├── ResumeTemplateRenderer.tsx        分发器：按 templateId 显式 switch 到对应模板
+    │   ├── SimpleSingleColumn.tsx            简约单栏（simple-single-column）
+    │   ├── SimpleSingleColumn.module.css
+    │   ├── BusinessSingleColumn.tsx          商务单栏（business-single-column）
+    │   ├── BusinessSingleColumn.module.css
+    │   ├── TwoColumn.tsx                     左右双栏（two-column）
+    │   └── TwoColumn.module.css
     └── styles/global.css
 ```
 
@@ -279,7 +288,11 @@ Next.js、Redux、Zustand、Tailwind、shadcn/ui、Material UI / Ant Design、�
 - `workEdits.ts` / `educationEdits.ts` / `projectEdits.ts` / `skillsEdits.ts` 都是无状态纯函数：`(Resume, 定位参数) → 新的 Resume`。只在找不到目标时原样返回传入的 `Resume`，绝不读写外部状态、不做 IO，也不承担持久化。四者刻意不共享代码。
 - `sectionVisibility.ts` 是唯一一个**真正通用**的 Section 操作：`visible` 是 `SectionBase` 上真实定义的字段，四类 Section 都拥有它，所以一个 `setSectionVisible(resume, sectionId, visible)` 覆盖全部四类，不需要 `type` 参数、不需要按类型分家（不存在 `setWorkVisible` 这类函数）。通用性来自 Schema 已经先统一了，不是来自"四个 CRUD 看起来像"。
 - `SectionVisibilityControls` 只依赖 `SectionBase` 共有的 `id` / `title` / `visible`，按传入的 `sections` 顺序渲染，标题直接取 `section.title`（没有 type → 中文名的映射表，也没有写死四个固定项）。
-- `SimpleSingleColumn`（模板）只通过 props 接收数据并渲染，不知道编辑器的存在。`visible` 过滤与空 Section 隐藏都是它 M1 就有的行为——M2.6 没有改模板一行，只是接通了「勾选框 → state → 模板」这条链路。
+- `ResumeTemplateRenderer`（分发器）是预览侧唯一的模板入口：只接收 `resume`，读 `templateId` 后用一个**显式 `switch`** 渲染对应模板，不持状态、不取数、不读存储、不排序、不改数据。它**不是**模板注册中心——没有 id → 组件表、没有模板元数据、没有动态加载。未知 `templateId` 走 `default` 回退到简约单栏，只影响展示，不改数据、不写存储。
+- `SimpleSingleColumn` / `BusinessSingleColumn` / `TwoColumn`（三个模板）都只通过 props 接收数据并渲染，不知道编辑器的存在，也不知道彼此的存在。`visible` 过滤、`order` 排序与空 Section 隐藏是三者一致的行为，差异**全部集中在展示方式**——不引入模板专属数据字段，也不改 Schema。三者共用的 `buildEntries` / `isNonEmpty` / `formatDate` 等 helper **各自留一份，不抽公共 util**（M2 总验收时已确立「有 2~3 个真实复用场景才抽象」，同理适用于模板层）。
+- `TwoColumn` 的列分配（技能与联系方式进左栏，教育 / 工作 / 项目进右栏）是**模板内部的展示规则**，不写进数据、不新增 `layout` / `column` 字段、不重排 `resume.sections`；右栏内部仍然按 `order` 排序。左栏确实没有任何可渲染内容时，正文退回单栏，不保留一条空的窄栏。
+- `TemplateSwitcher` 是受控组件：当前值来自 props，变化时上抛回调，**不持有状态、不读路由、不读存储、不修改 Resume、不自动修复未知 `templateId`**（展示层回退不等于数据迁移）。它只有三个硬编码 option；`TEMPLATE_OPTIONS` 这类模板元数据表属于 M8。
+- `SimpleSingleColumn` 的 `visible` 过滤与空 Section 隐藏是 M1 就有的行为——M2.6 没有改模板一行，只是接通了「勾选框 → state → 模板」这条链路。M4 也未改动它：新增两个模板是通过 `ResumeTemplateRenderer` 接入的，原有的简约单栏一行未改。
 
 路由：
 
@@ -301,6 +314,8 @@ Next.js、Redux、Zustand、Tailwind、shadcn/ui、Material UI / Ant Design、�
 
 - 切换模板只改变 `templateId`，**不得**修改 `sections` 内容。
 - 模板不新增专属业务字段，不为模板修改数据结构。
+
+这条承诺在 M4 被真实检验过：三个模板由同一份 Resume 驱动，切换时只新建一个 root 对象（`{ ...resume, templateId }`），`profile` / `sections` / `style` 连引用都不变；往返切换任意次后，内容与最初逐字节一致。
 
 这是整个项目的架构基石。数据只有一份真相来源。
 

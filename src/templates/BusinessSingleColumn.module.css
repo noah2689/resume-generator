@@ -1,0 +1,195 @@
+/**
+ * 模板：商务单栏（business-single-column）样式
+ *
+ * 依据：docs/ai-context/04_TEMPLATE_SYSTEM_SPEC.md 第 3 节 Template B
+ *
+ * 视觉方向：比 Simple 更「商务」——左对齐 Header、短规则线、带颜色条的
+ * 模块标题、更明确的名字与职位层级差异。仍然低装饰、专业、中文商务风。
+ *
+ * 与 Simple 的差异**全部集中在展示方式**：
+ * - Header：居中对齐 → 左对齐，并加一条短规则线
+ * - 模块标题：细下边框 → 左侧色条（去掉下边框），字重与字距更重
+ * - 条目：公司名加重到 13px，职位单独一行
+ * - bullet：3px 圆点 → 4px 方点
+ *
+ * 明确不使用：渐变 / 卡片堆叠 / 图标库 / 时间轴 / 技能进度条 / 雷达图 /
+ * 背景大色块 / 装饰性插画。
+ *
+ * A4 约束与 Simple 相同：固定宽度 210mm + min-height 297mm，内容超长自然向下增长。
+ * 不实现分页（无 @media print、无分页线、无 page-break、无自动压缩），属 M6。
+ */
+
+.paper {
+  box-sizing: border-box;
+
+  width: 210mm;
+  min-height: 297mm;
+  padding: 16mm 18mm;
+
+  background: #ffffff;
+  color: #2b2b2b;
+  font-family: var(--font-sans, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif);
+  font-size: 12px;
+  line-height: 1.55;
+
+  /* 与 Simple 相同的单层浅阴影：外层舞台的呈现一致，不属于模板差异。 */
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+
+  overflow-wrap: anywhere;
+}
+
+/* ---------- 基本信息（商务版：左对齐 + 短规则线） ---------- */
+
+.header {
+  padding-bottom: 14px;
+  /* 整条 Header 下用一条细线收口，比 Simple 的粗底线更克制。 */
+  border-bottom: 1px solid #d7dbe0;
+}
+
+.nameBlock {
+  /* 名字与规则线作为一组，宽度由内容决定。 */
+  display: inline-block;
+}
+
+.name {
+  margin: 0;
+  font-size: 25px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #1a1a1a;
+}
+
+.nameRule {
+  display: block;
+  width: 40px;
+  height: 3px;
+  margin-top: 7px;
+  background: var(--accent);
+}
+
+.targetRole {
+  margin: 10px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  color: var(--accent);
+}
+
+/* 联系方式逐项排布，比单行拼接更容易扫读。 */
+.contactList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin: 9px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.contactItem {
+  font-size: 12px;
+  color: #5a5f66;
+}
+
+/* ---------- Section（商务版：左侧色条，无下边框） ---------- */
+
+.section {
+  margin-top: 17px;
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 9px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #1a1a1a;
+}
+
+.sectionTitleBar {
+  flex: none;
+  width: 3px;
+  height: 13px;
+  background: var(--accent);
+}
+
+/* ---------- 条目（商务版：公司名更重，职位单独一行） ---------- */
+
+.entry {
+  margin-bottom: 11px;
+}
+
+.entry:last-child {
+  margin-bottom: 0;
+}
+
+.entryHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.entryTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #17181a;
+}
+
+.entryDate {
+  flex: none;
+  font-size: 11px;
+  color: #6f757d;
+  white-space: nowrap;
+}
+
+.entrySubtitle {
+  margin: 3px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+/* ---------- Bullet（商务版：方点，非圆点） ---------- */
+
+.bullets {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bullet {
+  position: relative;
+  padding-left: 13px;
+  font-size: 12px;
+  color: #2b2b2b;
+}
+
+.bullet::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0.6em;
+  width: 4px;
+  height: 4px;
+  background: var(--accent);
+  opacity: 0.8;
+}
+
+/* ---------- 技能 ---------- */
+
+.skillList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 22px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.skill {
+  font-size: 12px;
+  color: #2b2b2b;
+}

@@ -7,10 +7,11 @@ import EducationExperienceForm from '../components/EducationExperienceForm';
 import ProjectExperienceForm from '../components/ProjectExperienceForm';
 import SectionVisibilityControls from '../components/SectionVisibilityControls';
 import SkillsForm from '../components/SkillsForm';
+import TemplateSwitcher from '../components/TemplateSwitcher';
 import WorkExperienceForm from '../components/WorkExperienceForm';
 import { sampleResume } from '../data/sampleResume';
 import { loadResumeFromStorage, saveResumeToStorage } from '../storage/resumeStorage';
-import SimpleSingleColumn from '../templates/SimpleSingleColumn';
+import ResumeTemplateRenderer from '../templates/ResumeTemplateRenderer';
 import type { Resume } from '../types/resume';
 import {
   addEducationBullet,
@@ -58,8 +59,9 @@ import styles from './EditorPage.module.css';
  * M2.5 阶段：加入技能 CRUD。
  * M2.6 阶段：加入 Section 显示 / 隐藏。
  * M3 阶段：加入 LocalStorage 持久化，刷新后恢复。
+ * M4 阶段：加入模板切换（简约单栏 / 商务单栏 / 左右双栏）。
  * - 左侧：模块显示 + 基本信息 + 工作经历 + 教育经历 + 项目经历 + 技能
- * - 右侧：A4 简历预览
+ * - 右侧：预览工具栏（模板选择）+ A4 简历预览
  *
  * 数据流：
  *
@@ -73,7 +75,8 @@ import styles from './EditorPage.module.css';
  *       ├── 左侧 EducationExperienceForm 修改 education section 的 items
  *       ├── 左侧 ProjectExperienceForm 修改 project section 的 items
  *       ├── 左侧 SkillsForm 修改 skills section 的 items
- *       └── 右侧 SimpleSingleColumn(resume)
+ *       ├── 右侧 TemplateSwitcher 只修改 resume.templateId
+ *       └── 右侧 ResumeTemplateRenderer(resume) → 按 templateId 选模板组件
  *
  *   resume 真正变成新对象 → useEffect → saveResumeToStorage
  *
@@ -85,15 +88,16 @@ import styles from './EditorPage.module.css';
  *   与四套 item CRUD 是不同层次的东西，因此不放进任何一个 edits 文件。
  * - 持久化实现在 ../storage/resumeStorage：本页只在 state 真正变化后调用它。
  *   上面那些 edits 仍是纯函数，绝不写 LocalStorage——storage IO 只发生在这里与 resumeStorage 内部。
- * - 简历纸面与排版属于模板组件。
+ * - 预览具体用哪个模板由 ../templates/ResumeTemplateRenderer 决定：
+ *   本页只知道「有一个模板渲染器」，不需要认识三个模板组件，切换时也只改 templateId。
+ * - 简历纸面与排版属于模板组件（SimpleSingleColumn / BusinessSingleColumn / TwoColumn）。
  * - Section 排序属于后续阶段。
  *
  * 已知问题（记录，本阶段不处理）：
- * 四组 CRUD + 显隐接入后本文件持续变长：M2.4 为 354 行，M2.5 为 406 行，M2.6 后 441 行，
- * M3（持久化）后 493 行。
+ * CRUD、显隐、持久化、模板切换逐步接入后，本文件持续变长。
  * **行数本身不是重构触发条件**：M2 总验收后仍决定保持各类型 CRUD 独立，
  * 是否拆出 hook / controller 属于后续按职责单独评估的独立判断，
- * 不在任何单个任务里顺手做，也不因为「超过 400 行」就自动动手。
+ * 不在任何单个任务里顺手做，也从不因为「超过某个行数」就自动动手。
  */
 export default function EditorPage() {
   const { resumeId } = useParams<{ resumeId: string }>();
@@ -396,6 +400,36 @@ export default function EditorPage() {
     );
   };
 
+  /**
+   * 切换模板。
+   *
+   * 这是 M4 的核心约束所在：**只改 templateId**。
+   *
+   * - 只新建 root 对象，profile / sections / style 连引用都保持不变，
+   *   每个 Section / item 也不会被重建。验收判据就是这三条引用相等：
+   *     next.profile === current.profile
+   *     next.sections === current.sections
+   *     next.style === current.style
+   * - 不重建 profile、不 clone items、不 reset style、不按模板调整 order、
+   *   不清理隐藏模块、不给模板注入默认内容。
+   * - 同值时直接返回 current（不触发无意义的写盘与重渲染）。
+   *
+   * 持久化不需要额外处理：M3 存的是整份 Resume，这个新 root 会被现有的
+   * useEffect 天然接住，templateId 自然跟随。因此本函数不碰 LocalStorage。
+   */
+  const handleTemplateChange = (templateId: string) => {
+    setResume((current) => {
+      if (!current || current.templateId === templateId) {
+        return current;
+      }
+
+      return {
+        ...current,
+        templateId,
+      };
+    });
+  };
+
   // 只读地用一下各 section：有就渲染表单，没有就显示提示。
   // 这里不创建 Section——Section 的新增 / 删除属于之后的任务。
   // 注意：这些查找**不看 visible**。隐藏只影响右侧输出，
@@ -482,9 +516,18 @@ export default function EditorPage() {
       </aside>
 
       <div className={styles.previewArea}>
+        {/* 预览工具栏：M4 只放模板切换，位于 A4 舞台上方。
+            这里不提前建立 M5 的右侧样式栏。 */}
+        <div className={styles.previewToolbar}>
+          <TemplateSwitcher
+            templateId={resume.templateId}
+            onChange={handleTemplateChange}
+          />
+        </div>
+
         <div className={styles.stage}>
           <div className={styles.paperSlot}>
-            <SimpleSingleColumn resume={resume} />
+            <ResumeTemplateRenderer resume={resume} />
           </div>
         </div>
       </div>
