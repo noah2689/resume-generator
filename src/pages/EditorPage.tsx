@@ -4,6 +4,7 @@ import BasicInfoForm, {
   type EditableBasicInfoField,
 } from '../components/BasicInfoForm';
 import EducationExperienceForm from '../components/EducationExperienceForm';
+import ProjectExperienceForm from '../components/ProjectExperienceForm';
 import WorkExperienceForm from '../components/WorkExperienceForm';
 import { sampleResume } from '../data/sampleResume';
 import SimpleSingleColumn from '../templates/SimpleSingleColumn';
@@ -17,6 +18,15 @@ import {
   updateEducationItem,
   type EducationItemTextField,
 } from './educationEdits';
+import {
+  addProjectBullet,
+  addProjectItem,
+  removeProjectBullet,
+  removeProjectItem,
+  updateProjectBullet,
+  updateProjectItem,
+  type ProjectItemTextField,
+} from './projectEdits';
 import {
   addWorkBullet,
   addWorkItem,
@@ -34,7 +44,8 @@ import styles from './EditorPage.module.css';
  * M2.1 阶段：最小两栏可编辑页面。
  * M2.2 阶段：在此基础上支持工作经历 CRUD。
  * M2.3 阶段：加入教育经历 CRUD。
- * - 左侧：基本信息表单 + 工作经历表单 + 教育经历表单
+ * M2.4 阶段：加入项目经历 CRUD。
+ * - 左侧：基本信息 + 工作经历 + 教育经历 + 项目经历 四块表单
  * - 右侧：A4 简历预览
  *
  * 数据流：
@@ -45,15 +56,20 @@ import styles from './EditorPage.module.css';
  *       ├── 左侧 BasicInfoForm 修改 profile / targetRole
  *       ├── 左侧 WorkExperienceForm 修改 work section 的 items
  *       ├── 左侧 EducationExperienceForm 修改 education section 的 items
+ *       ├── 左侧 ProjectExperienceForm 修改 project section 的 items
  *       └── 右侧 SimpleSingleColumn(resume)
  *
  * 职责边界：
  * - 本页持有 Resume 状态（不拆 Context / store / reducer），并负责布局。
- * - 各 Section 的嵌套不可变更新分别实现在 ./workEdits 与 ./educationEdits，
- *   本页只做「把 state 传进去、把结果存回来」。两者刻意不合并成通用 CRUD 层。
+ * - 各 Section 的嵌套不可变更新分别实现在 ./workEdits / ./educationEdits / ./projectEdits，
+ *   本页只做「把 state 传进去、把结果存回来」。三者刻意不合并成通用 CRUD 层。
  * - 简历纸面与排版属于模板组件。
- * - 项目 / 技能编辑、Section 显示隐藏与排序属于后续阶段。
+ * - 技能编辑、Section 显示隐藏与排序属于后续阶段。
  * - 本阶段没有持久化：刷新后回到示例数据是正确行为。
+ *
+ * 已知问题（记录，本阶段不处理）：
+ * 三组 CRUD 接入后本文件持续变长。是否值得拆出 hook / controller，
+ * 等 M2 全部验收通过后单独评估，不在任何单个 CRUD 任务里顺手做。
  */
 export default function EditorPage() {
   const { resumeId } = useParams<{ resumeId: string }>();
@@ -213,11 +229,64 @@ export default function EditorPage() {
     );
   };
 
-  // 只读地用一下 work / education section：有就渲染表单，没有就显示提示。
+  /**
+   * 以下 6 个处理器是项目经历的唯一写入口。
+   *
+   * 与上面的工作 / 教育处理器同构，但同样刻意不复用同一个函数：
+   * 字段类型不同（ProjectItemTextField 只有 4 个字段，没有 city），
+   * 更新函数也不同。第二、第三个真实样本落地后，是否抽公共层属于
+   * M2 验收后的独立判断，不在本任务里顺手做。
+   */
+  const handleProjectAddItem = () => {
+    setResume((current) => (current ? addProjectItem(current) : current));
+  };
+
+  const handleProjectChangeField = (
+    itemId: string,
+    field: ProjectItemTextField,
+    value: string,
+  ) => {
+    setResume((current) =>
+      current ? updateProjectItem(current, itemId, field, value) : current,
+    );
+  };
+
+  const handleProjectRemoveItem = (itemId: string) => {
+    setResume((current) =>
+      current ? removeProjectItem(current, itemId) : current,
+    );
+  };
+
+  const handleProjectAddBullet = (itemId: string) => {
+    setResume((current) =>
+      current ? addProjectBullet(current, itemId) : current,
+    );
+  };
+
+  const handleProjectChangeBullet = (
+    itemId: string,
+    bulletIndex: number,
+    value: string,
+  ) => {
+    setResume((current) =>
+      current ? updateProjectBullet(current, itemId, bulletIndex, value) : current,
+    );
+  };
+
+  const handleProjectRemoveBullet = (itemId: string, bulletIndex: number) => {
+    setResume((current) =>
+      current ? removeProjectBullet(current, itemId, bulletIndex) : current,
+    );
+  };
+
+  // 只读地用一下各 section：有就渲染表单，没有就显示提示。
   // 这里不创建 Section——Section 的新增 / 删除属于之后的任务。
   const workSection = resume.sections.find((section) => section.type === 'work');
   const educationSection = resume.sections.find(
     (section) => section.type === 'education',
+  );
+  const projectSection = resume.sections.find(
+    (section) => section.type === 'project',
   );
 
   return (
@@ -255,6 +324,20 @@ export default function EditorPage() {
           />
         ) : (
           <p className={styles.missingSection}>当前简历没有教育经历模块。</p>
+        )}
+
+        {projectSection ? (
+          <ProjectExperienceForm
+            items={projectSection.items}
+            onAddItem={handleProjectAddItem}
+            onChangeField={handleProjectChangeField}
+            onRemoveItem={handleProjectRemoveItem}
+            onAddBullet={handleProjectAddBullet}
+            onChangeBullet={handleProjectChangeBullet}
+            onRemoveBullet={handleProjectRemoveBullet}
+          />
+        ) : (
+          <p className={styles.missingSection}>当前简历没有项目经历模块。</p>
         )}
       </aside>
 
