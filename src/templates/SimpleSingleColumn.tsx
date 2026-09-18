@@ -74,8 +74,14 @@ export default function SimpleSingleColumn({ resume }: { resume: Resume }) {
   );
 }
 
-/** 条目所需的展示数据，已全部处理为空值无关的纯字符串。 */
+/**
+ * 条目所需的展示数据，已全部处理为空值无关的纯字符串。
+ *
+ * `id` 保留数据里的条目 id：M2.2 起列表可增删，React key 必须用稳定 id
+ * 而不是数组下标，因此这里不能把它丢掉。
+ */
 interface EntryView {
+  id: string;
   title: string;
   dateRange: string;
   subtitleParts: (string | undefined)[];
@@ -102,15 +108,15 @@ function SectionBlock({ section }: { section: ResumeSection }) {
 
       {section.type === 'skills' ? (
         <ul className={styles.skillList}>
-          {entries.map((entry, index) => (
-            <li key={index} className={styles.skill}>
+          {entries.map((entry) => (
+            <li key={entry.id} className={styles.skill}>
               {joinNonEmpty([entry.title, entry.subtitleParts[0]], ' · ')}
             </li>
           ))}
         </ul>
       ) : (
-        entries.map((entry, index) => (
-          <div key={index} className={styles.entry}>
+        entries.map((entry) => (
+          <div key={entry.id} className={styles.entry}>
             <div className={styles.entryHead}>
               {entry.title && (
                 <h3 className={styles.entryTitle}>{entry.title}</h3>
@@ -138,6 +144,7 @@ function buildEntries(section: ResumeSection): EntryView[] {
   switch (section.type) {
     case 'education':
       return section.items.map((item) => ({
+        id: item.id,
         title: item.school,
         dateRange: formatDateRange(item.startDate, item.endDate),
         subtitleParts: [item.major, item.degree, item.city],
@@ -145,6 +152,7 @@ function buildEntries(section: ResumeSection): EntryView[] {
       }));
     case 'work':
       return section.items.map((item) => ({
+        id: item.id,
         title: item.company,
         dateRange: formatDateRange(item.startDate, item.endDate),
         subtitleParts: [item.role, item.city],
@@ -152,6 +160,7 @@ function buildEntries(section: ResumeSection): EntryView[] {
       }));
     case 'project':
       return section.items.map((item) => ({
+        id: item.id,
         title: item.name,
         dateRange: formatDateRange(item.startDate, item.endDate),
         subtitleParts: [item.role],
@@ -159,6 +168,7 @@ function buildEntries(section: ResumeSection): EntryView[] {
       }));
     case 'skills':
       return section.items.map((item) => ({
+        id: item.id,
         title: item.name,
         dateRange: '',
         subtitleParts: [item.level],

@@ -20,10 +20,28 @@
 /*
  * 左侧栏：固定宽度，不 sticky、不折叠。
  * flex: none 防止被压缩；表单内部滚动由页面整体滚动承担。
+ * M2.2 起左侧有「基本信息」和「工作经历」两个表单块，因此改为竖排 + 间距。
  */
 .sidebar {
   flex: none;
   width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/*
+ * 「当前简历没有工作经历模块」提示。
+ * 这是开发态空状态，排版从简：M2.2 不创建 Section，因此正常路径不会看到它。
+ */
+.missingSection {
+  margin: 0;
+  padding: 16px;
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--color-text-muted);
 }
 
 /*
