@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import BasicInfoForm, {
   type EditableBasicInfoField,
@@ -9,6 +9,7 @@ import SectionVisibilityControls from '../components/SectionVisibilityControls';
 import SkillsForm from '../components/SkillsForm';
 import WorkExperienceForm from '../components/WorkExperienceForm';
 import { sampleResume } from '../data/sampleResume';
+import { loadResumeFromStorage, saveResumeToStorage } from '../storage/resumeStorage';
 import SimpleSingleColumn from '../templates/SimpleSingleColumn';
 import type { Resume } from '../types/resume';
 import {
@@ -56,13 +57,15 @@ import styles from './EditorPage.module.css';
  * M2.4 阶段：加入项目经历 CRUD。
  * M2.5 阶段：加入技能 CRUD。
  * M2.6 阶段：加入 Section 显示 / 隐藏。
+ * M3 阶段：加入 LocalStorage 持久化，刷新后恢复。
  * - 左侧：模块显示 + 基本信息 + 工作经历 + 教育经历 + 项目经历 + 技能
  * - 右侧：A4 简历预览
  *
  * 数据流：
  *
- *   sampleResume
- *       ↓ 初始化
+ *   localStorage（有可用数据则优先）
+ *       ↓ 无数据 / 数据不可用 → 回退 sampleResume
+ *       ↓ 初始化（lazy initializer，发生在首次渲染前）
  *   EditorPage resume state
  *       ├── 左侧 BasicInfoForm 修改 profile / targetRole
  *       ├── 左侧 SectionVisibilityControls 修改各 Section 的 visible
@@ -72,18 +75,22 @@ import styles from './EditorPage.module.css';
  *       ├── 左侧 SkillsForm 修改 skills section 的 items
  *       └── 右侧 SimpleSingleColumn(resume)
  *
+ *   resume 真正变成新对象 → useEffect → saveResumeToStorage
+ *
  * 职责边界：
  * - 本页持有 Resume 状态（不拆 Context / store / reducer），并负责布局。
  * - 各 Section 的嵌套不可变更新分别实现在 ./workEdits / ./educationEdits / ./projectEdits / ./skillsEdits，
  *   本页只做「把 state 传进去、把结果存回来」。四者刻意不合并成通用 CRUD 层。
  * - Section 显隐实现在 ./sectionVisibility：它只改 Section 外壳的 visible，
  *   与四套 item CRUD 是不同层次的东西，因此不放进任何一个 edits 文件。
+ * - 持久化实现在 ../storage/resumeStorage：本页只在 state 真正变化后调用它。
+ *   上面那些 edits 仍是纯函数，绝不写 LocalStorage——storage IO 只发生在这里与 resumeStorage 内部。
  * - 简历纸面与排版属于模板组件。
  * - Section 排序属于后续阶段。
- * - 本阶段没有持久化：刷新后回到示例数据是正确行为。
  *
  * 已知问题（记录，本阶段不处理）：
- * 四组 CRUD + 显隐接入后本文件持续变长：M2.4 为 354 行，M2.5 为 406 行，M2.6 后 441 行。
+ * 四组 CRUD + 显隐接入后本文件持续变长：M2.4 为 354 行，M2.5 为 406 行，M2.6 后 441 行，
+ * M3（持久化）后 493 行。
  * **行数本身不是重构触发条件**：M2 总验收后仍决定保持各类型 CRUD 独立，
  * 是否拆出 hook / controller 属于后续按职责单独评估的独立判断，
  * 不在任何单个任务里顺手做，也不因为「超过 400 行」就自动动手。
@@ -91,23 +98,69 @@ import styles from './EditorPage.module.css';
 export default function EditorPage() {
   const { resumeId } = useParams<{ resumeId: string }>();
 
-  // M2.1 仍然只有一份示例数据，因此这里直接比较 ID。
-  // 简历列表与持久化属于后续 Milestone，暂不引入任何存储层。
+  // 仍然只有一份示例数据，因此这里直接比较 ID。
+  // 只有已知 Resume 才继续；未知 ID 走下面的「未找到简历」，与 M2 行为一致。
   const found: Resume | null = sampleResume.id === resumeId ? sampleResume : null;
 
   /**
    * Resume state 只放在本页。
    *
-   * 初始化直接以找到的 Resume 作为初始值，不做深拷贝：
-   * 只要严格遵守下面的不可变更新规则（每次返回新的 root/profile/sections 对象，
-   * 不直接给 resume 的字段赋值、不改动任何数组），
-   * 模块级的 sampleResume 就不会被修改。
+   * 用 lazy initializer 决定初始值，使「恢复」发生在**首次渲染之前**：
+   * 不会先渲染示例数据再补一次加载（那样会闪一下），也不需要 loading 页。
+   * LocalStorage 是同步 API，所以这里可以同步读。
+   *
+   * 取值顺序：
+   *   1. 路由不认识这个 resumeId → null（沿用「未找到简历」分支）
+   *   2. LocalStorage 有可用数据 → persisted Resume
+   *   3. 其余情况（无数据 / 坏数据 / 版本不符 / 读取抛错）→ sampleResume
+   *
+   * initializer 必须是纯函数（StrictMode 下会被调用两次），
+   * 所以它只读不写：读取失败不会顺手清理掉存储里的旧值。
+   *
+   * 不做深拷贝。只要严格遵守下面的不可变更新规则（每次返回新的
+   * root/profile/sections 对象，不直接给 resume 的字段赋值、不改动任何数组），
+   * 无论 state 初始值是 sampleResume 还是从存储解析出来的新对象，都不会被就地修改。
    *
    * 已知限制：当前只有一份示例简历，因此接受「路由参数在运行期间
    * 不会切换到另一份 Resume」。将来支持多份简历切换时，需要补上
    * 状态重置（例如拆分内层组件并加 key，或监听 resumeId 变化）。
    */
-  const [resume, setResume] = useState<Resume | null>(found);
+  const [resume, setResume] = useState<Resume | null>(() => {
+    if (!found) {
+      return null;
+    }
+    return loadResumeFromStorage(found.id, found.schemaVersion) ?? found;
+  });
+
+  /**
+   * 首次 mount 的门禁。
+   *
+   * 用「初始 Resume 的引用」而不是 `hasMounted` 布尔量：本组件跑在
+   * StrictMode 下，effect 会被 setup → cleanup → setup 重复执行。
+   * 布尔门禁是被 effect 自己翻转的，第二次 setup 无法区分「同一次 mount」
+   * 与「用户真的改了数据」，会把初始值当成一次真实变更写下去——
+   * 那正好会在 mount 期间用 sampleResume 覆盖掉存储里的坏数据 / 旧版本数据。
+   *
+   * 引用比较是个不变量：初始引用在整个生命周期内不变，而任何真实编辑
+   * 都经过不可变更新、必然产生新对象，所以 effect 重复执行多少次结果都一样。
+   */
+  const initialResumeRef = useRef(resume);
+
+  /**
+   * 自动保存：resume 真正变成新对象后，把整份 Resume 写回 LocalStorage。
+   *
+   * 只在 state 生命周期里保存一次，不给 handlers 或各个 edits 纯函数加存储调用。
+   * 没有防抖、没有手动保存按钮、没有保存状态 UI——Resume 很小，写一次 JSON 足够。
+   */
+  useEffect(() => {
+    if (!resume) {
+      return;
+    }
+    if (resume === initialResumeRef.current) {
+      return;
+    }
+    saveResumeToStorage(resume);
+  }, [resume]);
 
   if (!resume) {
     return (
