@@ -3,10 +3,20 @@ import { Link, useParams } from 'react-router-dom';
 import BasicInfoForm, {
   type EditableBasicInfoField,
 } from '../components/BasicInfoForm';
+import EducationExperienceForm from '../components/EducationExperienceForm';
 import WorkExperienceForm from '../components/WorkExperienceForm';
 import { sampleResume } from '../data/sampleResume';
 import SimpleSingleColumn from '../templates/SimpleSingleColumn';
 import type { Resume } from '../types/resume';
+import {
+  addEducationBullet,
+  addEducationItem,
+  removeEducationBullet,
+  removeEducationItem,
+  updateEducationBullet,
+  updateEducationItem,
+  type EducationItemTextField,
+} from './educationEdits';
 import {
   addWorkBullet,
   addWorkItem,
@@ -23,7 +33,8 @@ import styles from './EditorPage.module.css';
  *
  * M2.1 阶段：最小两栏可编辑页面。
  * M2.2 阶段：在此基础上支持工作经历 CRUD。
- * - 左侧：基本信息表单 + 工作经历表单
+ * M2.3 阶段：加入教育经历 CRUD。
+ * - 左侧：基本信息表单 + 工作经历表单 + 教育经历表单
  * - 右侧：A4 简历预览
  *
  * 数据流：
@@ -33,13 +44,15 @@ import styles from './EditorPage.module.css';
  *   EditorPage resume state
  *       ├── 左侧 BasicInfoForm 修改 profile / targetRole
  *       ├── 左侧 WorkExperienceForm 修改 work section 的 items
+ *       ├── 左侧 EducationExperienceForm 修改 education section 的 items
  *       └── 右侧 SimpleSingleColumn(resume)
  *
  * 职责边界：
  * - 本页持有 Resume 状态（不拆 Context / store / reducer），并负责布局。
- * - 工作经历的嵌套不可变更新实现在 ./workEdits，本页只做「把 state 传进去、把结果存回来」。
+ * - 各 Section 的嵌套不可变更新分别实现在 ./workEdits 与 ./educationEdits，
+ *   本页只做「把 state 传进去、把结果存回来」。两者刻意不合并成通用 CRUD 层。
  * - 简历纸面与排版属于模板组件。
- * - 教育 / 项目 / 技能编辑、Section 显示隐藏与排序属于后续阶段。
+ * - 项目 / 技能编辑、Section 显示隐藏与排序属于后续阶段。
  * - 本阶段没有持久化：刷新后回到示例数据是正确行为。
  */
 export default function EditorPage() {
@@ -148,9 +161,64 @@ export default function EditorPage() {
     );
   };
 
-  // 只读地用一下 work section：有就渲染表单，没有就显示提示。
+  /**
+   * 以下 6 个处理器是教育经历的唯一写入口。
+   *
+   * 与上面的工作经历处理器同构，但刻意不复用同一个函数：
+   * 两者的字段类型（WorkItemTextField / EducationItemTextField）与
+   * 更新函数不同，现在只有一个稳定样本，还看不出真正的共性在哪。
+   * 重复本身是后续判断抽象是否合理的证据。
+   */
+  const handleEducationAddItem = () => {
+    setResume((current) => (current ? addEducationItem(current) : current));
+  };
+
+  const handleEducationChangeField = (
+    itemId: string,
+    field: EducationItemTextField,
+    value: string,
+  ) => {
+    setResume((current) =>
+      current ? updateEducationItem(current, itemId, field, value) : current,
+    );
+  };
+
+  const handleEducationRemoveItem = (itemId: string) => {
+    setResume((current) =>
+      current ? removeEducationItem(current, itemId) : current,
+    );
+  };
+
+  const handleEducationAddBullet = (itemId: string) => {
+    setResume((current) =>
+      current ? addEducationBullet(current, itemId) : current,
+    );
+  };
+
+  const handleEducationChangeBullet = (
+    itemId: string,
+    bulletIndex: number,
+    value: string,
+  ) => {
+    setResume((current) =>
+      current
+        ? updateEducationBullet(current, itemId, bulletIndex, value)
+        : current,
+    );
+  };
+
+  const handleEducationRemoveBullet = (itemId: string, bulletIndex: number) => {
+    setResume((current) =>
+      current ? removeEducationBullet(current, itemId, bulletIndex) : current,
+    );
+  };
+
+  // 只读地用一下 work / education section：有就渲染表单，没有就显示提示。
   // 这里不创建 Section——Section 的新增 / 删除属于之后的任务。
   const workSection = resume.sections.find((section) => section.type === 'work');
+  const educationSection = resume.sections.find(
+    (section) => section.type === 'education',
+  );
 
   return (
     <div className={styles.layout}>
@@ -173,6 +241,20 @@ export default function EditorPage() {
           />
         ) : (
           <p className={styles.missingSection}>当前简历没有工作经历模块。</p>
+        )}
+
+        {educationSection ? (
+          <EducationExperienceForm
+            items={educationSection.items}
+            onAddItem={handleEducationAddItem}
+            onChangeField={handleEducationChangeField}
+            onRemoveItem={handleEducationRemoveItem}
+            onAddBullet={handleEducationAddBullet}
+            onChangeBullet={handleEducationChangeBullet}
+            onRemoveBullet={handleEducationRemoveBullet}
+          />
+        ) : (
+          <p className={styles.missingSection}>当前简历没有教育经历模块。</p>
         )}
       </aside>
 
