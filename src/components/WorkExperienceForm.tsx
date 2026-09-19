@@ -20,6 +20,9 @@ import styles from './WorkExperienceForm.module.css';
  * 唯一属于本组件的 UI 关注点是删除确认：删除整条工作经历需要用户确认，
  * 确认通过后才调用 onRemove。删除单条 bullet 不需要确认（依据 05 第 11 节）。
  *
+ * 根节点是 <details>/<summary>，与左侧其余五个模块共用 name 做模块级折叠
+ * （05 第 3 节 Accordion）；折叠是纯 UI 状态，不碰 Resume、不持久化。
+ *
  * 依据：docs/ai-context/05_EDITOR_UX_SPEC.md 第 4、5、10、11 节
  */
 
@@ -52,8 +55,8 @@ export default function WorkExperienceForm({
   onRemoveBullet,
 }: WorkExperienceFormProps) {
   return (
-    <section className={styles.wrapper}>
-      <h2 className={styles.title}>工作经历</h2>
+    <details className={styles.wrapper} name="resume-editor-section">
+      <summary className={styles.title}>工作经历</summary>
 
       {items.length === 0 ? (
         <p className={styles.empty}>暂无工作经历</p>
@@ -138,7 +141,7 @@ export default function WorkExperienceForm({
       <button type="button" className={styles.addItem} onClick={onAddItem}>
         + 添加工作经历
       </button>
-    </section>
+    </details>
   );
 }
 

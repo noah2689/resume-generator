@@ -26,6 +26,9 @@ import styles from './SkillsForm.module.css';
  *   依据 05_EDITOR_UX_SPEC.md 第 11 节：删除保护针对工作经历、项目经历等重要内容；
  *   单条技能信息量小、容易重新添加，高频增删时确认框只会制造摩擦。
  *
+ * 根节点是 <details>/<summary>，与左侧其余五个模块共用 name 做模块级折叠
+ * （05 第 3 节 Accordion）；折叠是纯 UI 状态，不碰 Resume、不持久化。
+ *
  * 依据：docs/ai-context/03_RESUME_DATA_SCHEMA.md 第 8 节、05_EDITOR_UX_SPEC.md 第 10、11 节
  */
 
@@ -53,8 +56,8 @@ export default function SkillsForm({
   onRemoveItem,
 }: SkillsFormProps) {
   return (
-    <section className={styles.wrapper}>
-      <h2 className={styles.title}>技能</h2>
+    <details className={styles.wrapper} name="resume-editor-section">
+      <summary className={styles.title}>技能</summary>
 
       {items.length === 0 ? (
         <p className={styles.empty}>暂无技能</p>
@@ -98,6 +101,6 @@ export default function SkillsForm({
       <button type="button" className={styles.addItem} onClick={onAddItem}>
         + 添加技能
       </button>
-    </section>
+    </details>
   );
 }

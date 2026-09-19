@@ -25,6 +25,9 @@ import styles from './SectionVisibilityControls.module.css';
  * - 只控制 Section 外壳的显隐，不碰 items；隐藏某个 Section 不会影响
  *   左栏对应的内容编辑表单（visible 只控制输出，不控制编辑入口）。
  *
+ * 根节点是 <details>/<summary>，与左侧其余五个模块共用 name 做模块级折叠
+ * （05 第 3 节 Accordion）；折叠是纯 UI 状态，不碰 Resume、不持久化。
+ *
  * 依据：docs/ai-context/03_RESUME_DATA_SCHEMA.md 第 4 节、05_EDITOR_UX_SPEC.md 第 10 节
  */
 
@@ -38,8 +41,8 @@ export default function SectionVisibilityControls({
   onChange,
 }: SectionVisibilityControlsProps) {
   return (
-    <section className={styles.wrapper}>
-      <h2 className={styles.title}>模块显示</h2>
+    <details className={styles.wrapper} name="resume-editor-section">
+      <summary className={styles.title}>模块显示</summary>
 
       {sections.length === 0 ? (
         <p className={styles.empty}>当前简历没有可显示的内容模块。</p>
@@ -65,6 +68,6 @@ export default function SectionVisibilityControls({
           );
         })
       )}
-    </section>
+    </details>
   );
 }

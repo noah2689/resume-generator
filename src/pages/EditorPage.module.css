@@ -14,12 +14,16 @@
  * - 人工验收发现：页面很长时右侧样式栏跟着页面一起延伸，
  *   要先把整页拉很长才能操作到「显示头像」。因此**只给右侧样式栏**加了
  *   sticky + 视口高度不足时的内部滚动，左栏与中间预览行为不变。
+ * - 同一轮补上 05 第 3 节要求、此前无 milestone 认领的**左侧模块级 Accordion**
+ *   （六个模块各自的 <details>，见下方 .sidebar > details 规则）。
+ *   它不改数据，只改左栏的信息密度。
  *
  * 未找到简历时的错误状态使用 global.css 中的 .panel 样式，不在此处定义。
  *
  * 已知限制（有意不做）：三栏在窄屏下会挤压中间预览，预览靠 .stage 的横向滚动兜住。
- * 窄屏下中间预览继续依赖横向滚动；本轮只让右侧样式栏 sticky 并在视口高度不足时内部滚动。
- * 响应式折叠 / 拖拽调宽仍不做。
+ * 窄屏下中间预览继续依赖横向滚动。本轮布局改动只有两处：
+ * 右侧样式栏 sticky（视口高度不足时由它自己内部滚动）与左侧模块折叠。
+ * 响应式折叠 / 拖拽调宽 / 中间预览独立纵向滚动仍不做。
  */
 
 .layout {
@@ -29,9 +33,11 @@
 }
 
 /*
- * 左侧栏：固定宽度，不 sticky、不折叠。
+ * 左侧栏：固定宽度，本身不 sticky。
  * flex: none 防止被压缩；表单内部滚动由页面整体滚动承担。
  * M2.2 起左侧有「基本信息」和「工作经历」两个表单块，因此改为竖排 + 间距。
+ * 同一轮起栏内六个模块各自是一个 <details>（05 第 3 节 Accordion），
+ * 因此折叠的是**模块**，不是左栏本身——左栏始终在文档流里正常滚动。
  */
 .sidebar {
   flex: none;
@@ -39,6 +45,29 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/*
+ * 左侧模块折叠（05 第 3 节：内容编辑用 Accordion / Section 列表）。
+ *
+ * 折叠本身完全交给原生 <details>/<summary>，六个模块共用
+ * name="resume-editor-section"：现代浏览器据此自动互斥（开一个关另一个）。
+ * 不支持该 name 行为的旧浏览器退化为「可同时展开多个」——功能不坏、数据无风险，
+ * 只是不互斥，因此**不写 polyfill、不建 Accordion state / Context / reducer、
+ * 不手写 ARIA accordion**。
+ *
+ * 这里只补原生不够用的两件事：可点手感、收起时不留下多余空隙。
+ * 样式只作用于 .sidebar 的直接子 details，**不进六个 component 各自的 module CSS**
+ * （cursor / marker / 收起边距只在这一处声明，避免六份复制）。
+ * 原生 disclosure marker 保留，不自绘三角。
+ */
+.sidebar > details > summary {
+  cursor: pointer;
+}
+
+.sidebar > details:not([open]) > summary {
+  /* 收起时标题即整张卡片的全部内容，不该再留标题与内容之间那 12px。 */
+  margin-bottom: 0;
 }
 
 /*

@@ -16,6 +16,10 @@ import styles from './BasicInfoForm.module.css';
  *
  * 本次只暴露 5 个字段。avatar / gender / birthYear / website / wechat
  * 仍保留在数据结构中，但暂不在 UI 中暴露。
+ *
+ * 根节点是 <details>/<summary>：左侧六个模块共用 name 做模块级折叠（05 第 3 节
+ * Accordion）。**本模块是六个里唯一默认 `open` 的**，因为姓名与目标岗位是
+ * 一份简历最先要填的东西；折叠状态是短生命周期 UI 状态，不进 Resume、不持久化。
  */
 
 /**
@@ -51,8 +55,8 @@ export default function BasicInfoForm({
   onChange,
 }: BasicInfoFormProps) {
   return (
-    <section className={styles.wrapper}>
-      <h2 className={styles.title}>基本信息</h2>
+    <details className={styles.wrapper} name="resume-editor-section" open>
+      <summary className={styles.title}>基本信息</summary>
 
       <Field
         id="basic-info-name"
@@ -84,7 +88,7 @@ export default function BasicInfoForm({
         value={profile.city}
         onChange={(value) => onChange('city', value)}
       />
-    </section>
+    </details>
   );
 }
 
