@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import BasicInfoForm, {
   type EditableBasicInfoField,
@@ -65,6 +65,8 @@ import styles from './EditorPage.module.css';
  * - 左侧：模块显示 + 基本信息 + 工作经历 + 教育经历 + 项目经历 + 技能
  * - 中间：A4 简历预览
  * - 右侧：模板选择 + 样式设置（StyleControls）
+ * M6a 阶段：自动保存加防抖与状态显示（保存中… / 已保存 / 保存失败），
+ * 并在三栏上方补一条只读的 editor toolbar（简历名称 + 保存状态）。
  *
  * 数据流：
  *
@@ -82,7 +84,9 @@ import styles from './EditorPage.module.css';
  *       ├── 右侧 StyleControls 只修改 resume.style 的一个字段
  *       └── 中间 ResumeTemplateRenderer(resume) → 按 templateId 选模板组件
  *
- *   resume 真正变成新对象 → useEffect → saveResumeToStorage
+ *   resume 真正变成新对象 → useEffect → pendingResumeRef + 300ms timer
+ *       ↓ timer 到点 / 页面离开 / 组件卸载
+ *   saveResumeToStorage(resume) → true / false → saveStatus
  *
  * 职责边界：
  * - 本页持有 Resume 状态（不拆 Context / store / reducer），并负责布局。
@@ -105,6 +109,30 @@ import styles from './EditorPage.module.css';
  * 是否拆出 hook / controller 属于后续按职责单独评估的独立判断，
  * 不在任何单个任务里顺手做，也从不因为「超过某个行数」就自动动手。
  */
+
+/**
+ * 一次自动保存的可见状态（M6a）。
+ *
+ * 刻意定义在本文件里，不单独开 saveStatus.ts、也不放进 types/resume.ts：
+ * 它是「一次 IO 的结果」，不是简历数据，只有本页在用它。
+ */
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
+/** 四种状态对应的 UI 文案。UI 文案属于本页，不进 storage 层。 */
+const SAVE_STATUS_LABELS: Record<SaveStatus, string> = {
+  idle: '未修改',
+  saving: '保存中…',
+  saved: '已保存',
+  error: '保存失败',
+};
+
+/**
+ * 自动保存的防抖时长。
+ *
+ * 300ms 是「连续打字时几乎不触发中间写盘、停手后立刻落盘」的经验值。
+ * 不进 Resume、不进 LocalStorage：它是本页的交互参数。
+ */
+const SAVE_DEBOUNCE_MS = 300;
 
 /**
  * 把一个样式改动应用到 style 上（M5）。
@@ -196,11 +224,56 @@ export default function EditorPage() {
   const initialResumeRef = useRef(resume);
 
   /**
-   * 自动保存：resume 真正变成新对象后，把整份 Resume 写回 LocalStorage。
+   * 自动保存（M3 建立，M6a 加防抖与状态）。
    *
    * 只在 state 生命周期里保存一次，不给 handlers 或各个 edits 纯函数加存储调用。
-   * 没有防抖、没有手动保存按钮、没有保存状态 UI——Resume 很小，写一次 JSON 足够。
+   *
+   * 三个关注点分开（M6a）：
+   * - `initialResumeRef`：首帧门禁，只用来判断「这次变化是不是真实编辑」。
+   * - `pendingResumeRef`：**还没落盘的最新一份 Resume**。timer 到点时保存的是它，
+   *   而不是闭包里的 `resume`——闭包捕获的可能是被后面几次编辑取代掉的旧对象。
+   * - `saveTimerRef`：当前待触发的 debounce timer，用来「连续输入时取消前一个」。
+   *
+   * 状态流转：真实编辑 → pending 赋值 + `saving` → 重置 300ms timer
+   *          → timer 到点 → 写盘 → 成功 `saved`（清 pending）/ 失败 `error`（保留 pending）。
+   * 失败后不做自动重试：下一次真实编辑会重新走一遍，即「正常重试」。
    */
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+
+  const pendingResumeRef = useRef<Resume | null>(null);
+  const saveTimerRef = useRef<number | null>(null);
+
+  /**
+   * 把还没落盘的那一份同步写进去。
+   *
+   * 存在两个真实的丢数据窗口，都靠它兜住：
+   * - debounce 期间刷新 / 关标签页（React 不会跑 effect cleanup）；
+   * - debounce 期间 SPA 跳转导致组件卸载（cleanup 里的 clearTimeout 会把待写内容丢掉）。
+   *
+   * 因为 `localStorage.setItem` 是**同步**的，这里可以在离开前一刻安全补写，
+   * 最多只丢「最后一次编辑到离开之间没被 debounce 覆盖到」的那部分。
+   *
+   * 刻意不做两件事：
+   * - **不在卸载路径里 set React state**（组件正在消失，改也没人看）。
+   * - 不调 `beforeunload` / 不弹「有未保存修改」确认框：同步写盘已经够了，
+   *   弹窗只会打断用户。
+   *
+   * 失败时保留 pending，让后续 edit 或下一次 flush 再试。
+   */
+  const flushPendingSave = useCallback(() => {
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+
+    const pending = pendingResumeRef.current;
+    if (!pending) {
+      return;
+    }
+
+    pendingResumeRef.current = saveResumeToStorage(pending) ? null : pending;
+  }, []);
+
   useEffect(() => {
     if (!resume) {
       return;
@@ -208,8 +281,61 @@ export default function EditorPage() {
     if (resume === initialResumeRef.current) {
       return;
     }
-    saveResumeToStorage(resume);
+
+    pendingResumeRef.current = resume;
+    setSaveStatus('saving');
+
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+    }
+
+    saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = null;
+
+      const pending = pendingResumeRef.current;
+      if (!pending) {
+        return;
+      }
+
+      if (saveResumeToStorage(pending)) {
+        pendingResumeRef.current = null;
+        setSaveStatus('saved');
+      } else {
+        setSaveStatus('error');
+      }
+    }, SAVE_DEBOUNCE_MS);
   }, [resume]);
+
+  /**
+   * 离开页面 / 卸载组件时补写（M6a）。
+   *
+   * 两处共用同一个 flush：
+   * - `pagehide`：刷新、关标签页、前进后退。React 在这条路径上**不会**跑 cleanup，
+   *   所以必须单独监听。（不用 `beforeunload`：移动端不可靠，且会干扰 bfcache。）
+   * - effect cleanup：SPA 跳转导致本组件卸载。cleanup 里同时摘掉监听。
+   *
+   * StrictMode 安全：开发态的 setup → cleanup → setup 会在初始状态跑一次 cleanup，
+   * 此时 `pendingResumeRef.current` 与 `saveTimerRef.current` 都是 null，
+   * flush 什么都不做，因此**mount 依然是 0 次写盘**。
+   */
+  useEffect(() => {
+    const handlePageHide = () => {
+      flushPendingSave();
+    };
+
+    window.addEventListener('pagehide', handlePageHide);
+
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide);
+      flushPendingSave();
+    };
+  }, [flushPendingSave]);
+
+  /**
+   * 已知限制（记录，本轮不处理）：若页面被 bfcache 恢复（back/forward 缓存），
+   * 状态文案可能停在「保存中…」而数据其实已经写进去了（flush 刻意不 setState）。
+   * 用户下一次编辑会立刻自愈，因此不为此加 pageshow 协调逻辑。
+   */
 
   if (!resume) {
     return (
@@ -540,99 +666,113 @@ export default function EditorPage() {
     resume.profile.avatar.trim() !== '';
 
   return (
-    <div className={styles.layout}>
-      <aside className={styles.sidebar}>
-        <BasicInfoForm
-          profile={resume.profile}
-          targetRole={resume.targetRole}
-          onChange={handleBasicInfoChange}
-        />
-
-        {/* 模块显示放在基本信息之后、四类内容表单之前：
-            先决定「这份简历要不要这一块」，再往下编辑具体内容。 */}
-        <SectionVisibilityControls
-          sections={resume.sections}
-          onChange={handleSectionVisibilityChange}
-        />
-
-        {workSection ? (
-          <WorkExperienceForm
-            items={workSection.items}
-            onAddItem={handleWorkAddItem}
-            onChangeField={handleWorkChangeField}
-            onRemoveItem={handleWorkRemoveItem}
-            onAddBullet={handleWorkAddBullet}
-            onChangeBullet={handleWorkChangeBullet}
-            onRemoveBullet={handleWorkRemoveBullet}
-          />
-        ) : (
-          <p className={styles.missingSection}>当前简历没有工作经历模块。</p>
-        )}
-
-        {educationSection ? (
-          <EducationExperienceForm
-            items={educationSection.items}
-            onAddItem={handleEducationAddItem}
-            onChangeField={handleEducationChangeField}
-            onRemoveItem={handleEducationRemoveItem}
-            onAddBullet={handleEducationAddBullet}
-            onChangeBullet={handleEducationChangeBullet}
-            onRemoveBullet={handleEducationRemoveBullet}
-          />
-        ) : (
-          <p className={styles.missingSection}>当前简历没有教育经历模块。</p>
-        )}
-
-        {projectSection ? (
-          <ProjectExperienceForm
-            items={projectSection.items}
-            onAddItem={handleProjectAddItem}
-            onChangeField={handleProjectChangeField}
-            onRemoveItem={handleProjectRemoveItem}
-            onAddBullet={handleProjectAddBullet}
-            onChangeBullet={handleProjectChangeBullet}
-            onRemoveBullet={handleProjectRemoveBullet}
-          />
-        ) : (
-          <p className={styles.missingSection}>当前简历没有项目经历模块。</p>
-        )}
-
-        {skillsSection ? (
-          <SkillsForm
-            items={skillsSection.items}
-            onAddItem={handleSkillAddItem}
-            onChangeField={handleSkillChangeField}
-            onRemoveItem={handleSkillRemoveItem}
-          />
-        ) : (
-          <p className={styles.missingSection}>当前简历没有技能模块。</p>
-        )}
-      </aside>
-
-      <div className={styles.previewArea}>
-        <div className={styles.stage}>
-          <div className={styles.paperSlot}>
-            <ResumeTemplateRenderer resume={resume} />
-          </div>
-        </div>
+    /*
+     * editor toolbar（M6a）：三栏之外、之上的一条很薄的条，只放「简历名称 + 保存状态」。
+     * 刻意**不放**「导出 PDF / 预览」——那是 M6b 的真实按钮，本轮不放假按钮。
+     * 也不改全局 App 导航：这是页面级动作，留在页面级。
+     */
+    <div className={styles.editor}>
+      <div className={styles.editorToolbar}>
+        <span className={styles.editorTitle}>{resume.title}</span>
+        <span className={styles.saveStatus} data-status={saveStatus}>
+          {SAVE_STATUS_LABELS[saveStatus]}
+        </span>
       </div>
 
-      {/* 右侧样式栏（05 第 2 节）。
-          模板选择从 M4 的预览工具栏**移动**到这里，与主题色 / 字体 / 密度 / 头像
-          放在一起——它们都属于「改展示方式」，而预览区只负责展示结果。
-          M4 那条 .previewToolbar 因此被删除，模板切换仍然只有一个入口。 */}
-      <aside className={styles.styleSidebar}>
-        <TemplateSwitcher
-          templateId={resume.templateId}
-          onChange={handleTemplateChange}
-        />
+      <div className={styles.layout}>
+        <aside className={styles.sidebar}>
+          <BasicInfoForm
+            profile={resume.profile}
+            targetRole={resume.targetRole}
+            onChange={handleBasicInfoChange}
+          />
 
-        <StyleControls
-          style={resume.style}
-          hasAvatar={hasAvatar}
-          onChange={handleStyleChange}
-        />
-      </aside>
+          {/* 模块显示放在基本信息之后、四类内容表单之前：
+              先决定「这份简历要不要这一块」，再往下编辑具体内容。 */}
+          <SectionVisibilityControls
+            sections={resume.sections}
+            onChange={handleSectionVisibilityChange}
+          />
+
+          {workSection ? (
+            <WorkExperienceForm
+              items={workSection.items}
+              onAddItem={handleWorkAddItem}
+              onChangeField={handleWorkChangeField}
+              onRemoveItem={handleWorkRemoveItem}
+              onAddBullet={handleWorkAddBullet}
+              onChangeBullet={handleWorkChangeBullet}
+              onRemoveBullet={handleWorkRemoveBullet}
+            />
+          ) : (
+            <p className={styles.missingSection}>当前简历没有工作经历模块。</p>
+          )}
+
+          {educationSection ? (
+            <EducationExperienceForm
+              items={educationSection.items}
+              onAddItem={handleEducationAddItem}
+              onChangeField={handleEducationChangeField}
+              onRemoveItem={handleEducationRemoveItem}
+              onAddBullet={handleEducationAddBullet}
+              onChangeBullet={handleEducationChangeBullet}
+              onRemoveBullet={handleEducationRemoveBullet}
+            />
+          ) : (
+            <p className={styles.missingSection}>当前简历没有教育经历模块。</p>
+          )}
+
+          {projectSection ? (
+            <ProjectExperienceForm
+              items={projectSection.items}
+              onAddItem={handleProjectAddItem}
+              onChangeField={handleProjectChangeField}
+              onRemoveItem={handleProjectRemoveItem}
+              onAddBullet={handleProjectAddBullet}
+              onChangeBullet={handleProjectChangeBullet}
+              onRemoveBullet={handleProjectRemoveBullet}
+            />
+          ) : (
+            <p className={styles.missingSection}>当前简历没有项目经历模块。</p>
+          )}
+
+          {skillsSection ? (
+            <SkillsForm
+              items={skillsSection.items}
+              onAddItem={handleSkillAddItem}
+              onChangeField={handleSkillChangeField}
+              onRemoveItem={handleSkillRemoveItem}
+            />
+          ) : (
+            <p className={styles.missingSection}>当前简历没有技能模块。</p>
+          )}
+        </aside>
+
+        <div className={styles.previewArea}>
+          <div className={styles.stage}>
+            <div className={styles.paperSlot}>
+              <ResumeTemplateRenderer resume={resume} />
+            </div>
+          </div>
+        </div>
+
+        {/* 右侧样式栏（05 第 2 节）。
+            模板选择从 M4 的预览工具栏**移动**到这里，与主题色 / 字体 / 密度 / 头像
+            放在一起——它们都属于「改展示方式」，而预览区只负责展示结果。
+            M4 那条 .previewToolbar 因此被删除，模板切换仍然只有一个入口。 */}
+        <aside className={styles.styleSidebar}>
+          <TemplateSwitcher
+            templateId={resume.templateId}
+            onChange={handleTemplateChange}
+          />
+
+          <StyleControls
+            style={resume.style}
+            hasAvatar={hasAvatar}
+            onChange={handleStyleChange}
+          />
+        </aside>
+      </div>
     </div>
   );
 }

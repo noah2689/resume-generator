@@ -13,7 +13,8 @@
  * - 读取失败一律返回 null，由调用方决定回退（当前是 sampleResume）。
  *   **不迁移、不删除坏数据、不覆盖旧值**：当前没有迁移能力，
  *   静默删除用户旧数据比「暂时读不了」更不可逆。
- * - 写入失败静默吞掉：内存里的编辑应当继续正常工作。
+ * - 写入失败不抛错，只返回 false（M6a 起）：内存里的编辑应当继续正常工作，
+ *   但调用方需要知道「这一次到底写没写进去」，才能把真实结果告诉用户。
  * - 校验只排除「明显会让现有 UI / 模板崩溃的结构性坏数据」，
  *   不是完整运行时 Schema 校验器——那会把 types/resume.ts 复制成第二套 Schema。
  */
@@ -172,16 +173,23 @@ export function loadResumeFromStorage(
 /**
  * 保存简历（整份 JSON）。
  *
- * 写入失败（配额满 / 存储被禁用 / 隐私模式）时静默返回：
- * 页面不该因为持久化不可用而崩掉，内存里的编辑继续有效。
+ * 返回值就是这一次写入的**真实结果**：
+ * - `true`：`setItem` 成功，存储里已经是最新内容。
+ * - `false`：`JSON.stringify` 或 `setItem` 抛错（配额满 / 存储被禁用 / 隐私模式）。
+ *
+ * 无论成功还是失败都**不抛错**：持久化是增强能力，不是编辑的前置条件，
+ * 页面不该因为写不进去而崩掉，内存里的编辑继续有效。
+ *
+ * 失败时也**不清空、不改写已有数据**——旧值原样留着，比留一份半损坏的状态好。
  */
-export function saveResumeToStorage(resume: Resume): void {
+export function saveResumeToStorage(resume: Resume): boolean {
   try {
     localStorage.setItem(
       getResumeStorageKey(resume.id),
       JSON.stringify(resume),
     );
+    return true;
   } catch {
-    // 有意为空：持久化是增强能力，不是编辑的前置条件。
+    return false;
   }
 }

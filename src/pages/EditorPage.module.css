@@ -20,11 +20,76 @@
  *
  * 未找到简历时的错误状态使用 global.css 中的 .panel 样式，不在此处定义。
  *
+ * M6a：在三栏布局之上加了一条只读的 editor toolbar（.editorToolbar），
+ * 外面用 .editor 竖排包住「工具栏 + 三栏」。工具栏只放简历名称与保存状态，
+ * 不含导出 / 预览按钮（那是 M6b）。三栏内部结构与 M5 完全一致。
+ *
  * 已知限制（有意不做）：三栏在窄屏下会挤压中间预览，预览靠 .stage 的横向滚动兜住。
  * 窄屏下中间预览继续依赖横向滚动。本轮布局改动只有两处：
  * 右侧样式栏 sticky（视口高度不足时由它自己内部滚动）与左侧模块折叠。
  * 响应式折叠 / 拖拽调宽 / 中间预览独立纵向滚动仍不做。
  */
+
+/*
+ * 编辑器整页容器（M6a）：工具栏在上，三栏在下。
+ * 用 flex 竖排而不是给工具栏加 margin-bottom，
+ * 是为了让「工具栏与三栏之间」的间距只在这里声明一次。
+ */
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/*
+ * editor toolbar（M6a）。
+ *
+ * 刻意做得很薄：一行，左侧简历名称、右侧保存状态。
+ * 用的是与 .panel 同一套 surface / border 变量，视觉上属于既有的卡片体系，
+ * **没有**为它新建色板或 status color token。
+ *
+ * 保存状态用 data-status 属性选择器区分，而不是给四种状态各写一个 class：
+ * 状态是同一件事的四个取值，不需要四个类名。
+ */
+.editorToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+/* 简历名称：过长时省略号截断，不把保存状态挤出可视区。 */
+.editorTitle {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * 保存状态：低调的辅助文字，紧贴右侧不参与收缩。
+ * 「保存中…」本身就是足够的反馈，因此不引入 spinner / 图标库。
+ */
+.saveStatus {
+  flex: none;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/*
+ * 保存失败是唯一需要「被注意到」的状态，用一处明确但不刺眼的红。
+ * 这是普通错误色，不是颜色系统：只有这一条声明，没有配套变量与 token。
+ */
+.saveStatus[data-status='error'] {
+  color: #b3261e;
+}
 
 .layout {
   display: flex;
