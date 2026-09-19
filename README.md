@@ -247,7 +247,7 @@ Next.js、Redux、Zustand、Tailwind、shadcn/ui、Material UI / Ant Design、�
     ├── pages/                页面组件
     │   ├── MyResumesPage.tsx
     │   ├── NewResumePage.tsx
-    │   ├── EditorPage.tsx    编辑器：持有 Resume state + 两栏布局
+    │   ├── EditorPage.tsx    编辑器：持有 Resume state + 三栏布局
     │   ├── workEdits.ts      工作经历不可变更新纯函数（只处理 work Section）
     │   ├── educationEdits.ts 教育经历不可变更新纯函数（只处理 education Section）
     │   ├── projectEdits.ts   项目经历不可变更新纯函数（只处理 project Section）
