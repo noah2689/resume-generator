@@ -71,12 +71,16 @@
   color: var(--color-text-muted);
 }
 
-/* bullet 行：输入框占满剩余宽度，删除按钮不换行。 */
+/* 一条 bullet 的整块（输入行 + 可能出现的 AI 建议面板），行间距挂在这一层。 */
+.bulletBlock {
+  margin-bottom: 6px;
+}
+
+/* bullet 行：输入框占满剩余宽度，AI 与删除按钮不换行。 */
 .bulletRow {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 6px;
 }
 
 .bulletInput {
@@ -113,6 +117,103 @@
 .bulletRemove:hover {
   color: var(--color-text);
   border-color: var(--color-text-muted);
+}
+
+/* AI 优化按钮：与「删除」同一套次级按钮规格，放在输入框与删除之间。 */
+.bulletAi {
+  flex: none;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.bulletAi:hover:not(:disabled) {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+/*
+ * disabled 有两种原因：空 bullet，或别的行正在优化。
+ * 两者都只是「现在不能点」，不是错误状态，所以用最轻的一档表达，
+ * 不做红色 / 不做删除线。
+ */
+.bulletAi:disabled {
+  color: var(--color-border);
+  cursor: default;
+}
+
+/*
+ * AI 建议面板。
+ *
+ * 视觉上必须与「已经写进简历的内容」明确区分：用虚线框 + 浅底，
+ * 让它一眼看上去就是「还没被采纳的草稿」，而不是简历的一部分。
+ */
+.aiPanel {
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px dashed var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+}
+
+.aiPanelLabel {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.aiPanelText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.aiPanelActions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.aiAdopt {
+  padding: 4px 12px;
+  border: 1px solid var(--color-text);
+  border-radius: 4px;
+  background: var(--color-text);
+  color: var(--color-surface);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.aiDismiss {
+  padding: 4px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.aiDismiss:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+/* 失败 / stale 提示：一行文字，不占面板，不需要用户做任何选择。 */
+.aiPanelError {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
 }
 
 .addBullet {

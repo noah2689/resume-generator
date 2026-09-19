@@ -10,6 +10,7 @@ import SkillsForm from '../components/SkillsForm';
 import StyleControls, { type StyleChange } from '../components/StyleControls';
 import TemplateSwitcher from '../components/TemplateSwitcher';
 import WorkExperienceForm from '../components/WorkExperienceForm';
+import { requestBulletSuggestion } from '../ai/optimizeWorkBullet';
 import { sampleResume } from '../data/sampleResume';
 import { loadResumeFromStorage, saveResumeToStorage } from '../storage/resumeStorage';
 import ResumeTemplateRenderer from '../templates/ResumeTemplateRenderer';
@@ -70,6 +71,10 @@ import styles from './EditorPage.module.css';
  * M6b 阶段：toolbar 右侧加「导出 PDF」按钮（等字体就绪后调原生打印），
  * 并在三栏上补打印样式（隐藏编辑器 UI、重置纸面尺寸、按模块分页）。
  * 打印本身不改数据、不写存储，因此 M6b 没有引入任何新的状态。
+ * M7.1 阶段：工作描述 bullet 支持「AI 优化」——本页只提供一个把请求发出去的
+ * handler，AI 的瞬态 UI 状态留在 WorkExperienceForm 里。
+ * 整条链路仍然是「建议 → 用户点采用 → 走既有的 updateWorkBullet」，
+ * 因此页面没有新增任何 AI 写入路径，也没有新增持久化逻辑。
  *
  * 数据流：
  *
@@ -426,6 +431,21 @@ export default function EditorPage() {
   };
 
   /**
+   * 请求一条 AI 改写建议（M7.1）。
+   *
+   * 本页在这里的角色只是**组合根**：它把一个要发出去的请求交给 HTTP 边界，
+   * 自己不组装 prompt、不认识 provider、不知道 key。
+   *
+   * 刻意不做的事：
+   * - 不把结果写进 Resume。建议是瞬态的，只有用户点「采用」之后，
+   *   才由 WorkExperienceForm 调 handleWorkChangeBullet 走既有的写回路径。
+   * - 不 setSaveStatus、不 flush：没有数据变化，就不该有任何保存动作
+   *   （与 M6b 的「导出不触发保存」同一条理由）。
+   * - 不 try/catch：失败由调用方统一显示文案，这里吞掉就没人知道失败了。
+   */
+  const handleOptimizeBullet = (text: string) => requestBulletSuggestion(text);
+
+  /**
    * 以下 6 个处理器是教育经历的唯一写入口。
    *
    * 与上面的工作经历处理器同构，但刻意不复用同一个函数：
@@ -751,6 +771,7 @@ export default function EditorPage() {
               onAddBullet={handleWorkAddBullet}
               onChangeBullet={handleWorkChangeBullet}
               onRemoveBullet={handleWorkRemoveBullet}
+              onOptimizeBullet={handleOptimizeBullet}
             />
           ) : (
             <p className={styles.missingSection}>当前简历没有工作经历模块。</p>

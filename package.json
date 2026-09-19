@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:api": "node --env-file-if-exists=server/.env server/index.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "start": "node server/index.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

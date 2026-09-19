@@ -3,5 +3,10 @@ dist
 .DS_Store
 *.local
 
+# 环境变量与密钥（M7.1 起）。server/.env 里放 DEEPSEEK_API_KEY，
+# 绝不入库：一旦提交，密钥就等于永久泄露（git 历史不会因为后来的删除而消失）。
+.env
+.env.*
+
 # WorkBuddy 工具本地状态目录，不属于项目资产
 .workbuddy/

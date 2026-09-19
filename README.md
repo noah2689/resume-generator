@@ -19,8 +19,9 @@
 | M4 | 模板切换（共 3 个模板） | **已完成** |
 | M5 | 基础样式（主题色 / 字体 / 密度 / 头像） | **已完成** |
 | M6 | PDF 导出 | **已完成** |
+| M7.1 | 单条工作描述 AI 优化 | **已完成** |
 
-M0 ~ M6 全部通过，**MVP 正式完成**。M7（AI 内容辅助）与 M8（模板扩展）在 MVP 之后。
+M0 ~ M6 全部通过，**MVP 正式完成**。M7.1 在 MVP 之后落地。M7.2 及其后的 AI 能力、M8（模板扩展）尚未开始。
 
 > M2 已通过验收：基本信息可编辑，教育 / 工作 / 项目 / 技能四类内容可增删改，每个模块可单独显示或隐藏，所有改动实时反映在右侧预览上。M2 当时还没有保存——刷新会回到示例数据，保存与恢复在 M3 完成。
 >
@@ -31,6 +32,8 @@ M0 ~ M6 全部通过，**MVP 正式完成**。M7（AI 内容辅助）与 M8（�
 > M5 已通过验收：**简历的展示方式可以调整，内容一个字都不变**。右侧样式栏提供 4 项设置——主题色（5 个固定色）、字体（2 套中文组合）、密度（宽松 / 标准 / 紧凑）、显示头像开关；改动实时反映在预览上、自动保存、刷新后恢复。切换模板与调整样式是两件互相独立的事：改样式只重建 `style` 一个对象，`profile` / `sections` / `templateId` 连引用都不变。存储里出现不受支持的取值时（历史数据 / 手改），界面会明确告知并让预览走安全兜底，但**不自动改写数据、不写回存储**（展示层兜底 ≠ 数据迁移）。本轮**没有**头像上传入口、**没有**字体资产下载与嵌入、**没有**打印分页——那些分别属于后续阶段。
 
 > M6 已通过验收：**简历能按 A4 打印成 PDF，中文字体不再由用户机器决定**。本阶段分两段落地。M6a 把「保存」从乐观假设改成结果驱动：只有真的写进 LocalStorage 才显示「已保存」，写入失败显示「保存失败」，编辑停止 300ms 后落盘，离开页面立即 flush。M6b 接上导出：工具栏右侧新增「导出 PDF」按钮，点击时先 `await document.fonts.ready` 再调 `window.print()`，交给浏览器原生打印出纸——**没有 PDF 库、没有 Canvas 截图、没有第二次渲染、没有 DOM 克隆、没有服务端 Chromium**。纸张与分页完全交给 CSS：`@page { size: A4; margin: 16mm 18mm }` 负责每页重复的页边距（模板纸面自身的 `padding` 不会跨页重复，所以打印时把纸面宽度 / 最小高度 / 内边距 / 阴影全部归零），三个模板各自补上 `break-inside: avoid-page` 与 `break-after: avoid-page`，保证模块标题不被孤立在页底、条目不被腰斩；左右双栏模板打印时**仍然保持双栏**，不为了分页悄悄退回单栏。中文字体改为自托管（`@fontsource-variable/noto-sans-sc` / `@fontsource-variable/noto-serif-sc`，字体名带 `Variable` 后缀），PDF 里嵌入的是 Noto 本身，而不是各人机器上的苹方 / 宋体。导出按钮**不改数据、不触发保存、不弹二次确认**，它只是把当前预览交给打印；工具栏会提示「打印时请选择『另存为 PDF』，并关闭『页眉和页脚』」。
+
+> M7.1 已通过验收：**工作描述可以逐条请求 AI 改写建议，建议在用户点「采用」之前不会动到任何数据**。每个工作描述输入框旁多了一个「AI 优化」按钮，点击后由**服务端**调用 DeepSeek（模型 `deepseek-flash`，显式关闭思考模式）返回一条改写建议；建议以虚线面板形式展示在那一行下方，用户点「采用」才写回，点「取消」或什么都不做则 Resume 与 LocalStorage 全程 0 改动。为此引入了**一个最小的可信 Node server 边界**：浏览器请求同源的 `POST /api/ai/optimize-work-bullet`，只有 `{ text }` 一个字段；API key 只存在于服务端环境变量，浏览器侧代码与构建产物里都没有 provider 域名与密钥。并发上故意做得很窄——**全组件同时只允许 1 个 AI 请求在途**（请求期间只锁 AI 按钮，输入框与删除照常可用），因此结构上不存在乱序响应，也就不需要请求序号或结果丢弃逻辑。采用前会重新校验「这条 item 还在 / 下标仍合法 / 内容仍是发请求时的那段文字」，任一不成立就提示重新优化而**绝不猜位置**。M7.1 只做这一件事：**没有** AI 对话、整份简历生成、JD 分析、其他 Section 的 AI、流式输出、多 provider、prompt 编辑器或 AI 历史。
 
 ### M0 交付了什么
 
@@ -141,10 +144,11 @@ EditorPage 的 resume state
 - 头像上传入口：`ResumeProfile.avatar` 字段一直在数据结构里，但当前 UI 不提供上传，只提供「显示 / 不显示」开关
 - 用户自定义颜色 / 字号：主题色是固定 5 色，密度是固定 3 档，不给用户逐个调数值
 - Section 排序、Section 新增 / 删除
-- AI 功能、登录、首页视觉设计
+- AI 能力里除「工作描述单条改写」以外的一切：AI 对话、整份简历生成、JD 分析、教育 / 项目 / 技能 Section 的 AI、从空白生成 bullet、流式输出、多 provider 与 provider fallback、prompt 编辑器、AI 历史、用量面板（M7.1 只做了第一条，其余属于后续）
+- 登录、首页视觉设计
 - 通用 Section 编辑器 / 通用 ExperienceForm（见决策第 7 条，当前刻意不做）
 
-编辑器页当前支持：**读取示例数据渲染 A4 预览**、**编辑 5 个基本信息字段**、**增删改工作经历 / 教育经历 / 项目经历（各含每条描述）**、**增删改技能**、**单独显示 / 隐藏任一内容模块**、**在三个模板之间切换**、**调整主题色 / 字体 / 密度 / 是否显示头像**、**把改动自动存进浏览器、刷新后恢复**、**导出 PDF**，所有改动实时反映在中间预览上。它仍然没有头像上传入口，也没有打印设置面板——导出完全走浏览器原生打印对话框，页面不接管纸张 / 缩放 / 页边距。
+编辑器页当前支持：**读取示例数据渲染 A4 预览**、**编辑 5 个基本信息字段**、**增删改工作经历 / 教育经历 / 项目经历（各含每条描述）**、**增删改技能**、**单独显示 / 隐藏任一内容模块**、**在三个模板之间切换**、**调整主题色 / 字体 / 密度 / 是否显示头像**、**把改动自动存进浏览器、刷新后恢复**、**导出 PDF**、**对单条工作描述请求 AI 改写建议并选择是否采用**，所有改动实时反映在中间预览上。它仍然没有头像上传入口，也没有打印设置面板——导出完全走浏览器原生打印对话框，页面不接管纸张 / 缩放 / 页边距。
 
 ---
 
@@ -165,7 +169,11 @@ npm run dev
 npm run typecheck   # TypeScript 类型检查
 npm run build       # 类型检查 + 生产构建
 npm run preview     # 预览生产构建结果
+npm run dev:api     # 启动服务端（M7.1 起，AI 功能需要；读取 server/.env）
+npm start           # 生产模式：同一个进程托管 dist/ 与 /api
 ```
+
+M0～M6 的功能只用 `npm run dev` 就够。**AI 优化（M7.1）需要同时跑 `dev:api`**，并在 `server/.env` 里配置 `DEEPSEEK_API_KEY`（该文件已被 `.gitignore` 覆盖，见下方「验证工作描述 AI 优化」）。
 
 ### 验证数据链路确实成立
 
@@ -219,6 +227,38 @@ M2.4 之后可以这样验证「项目经历 CRUD」成立：
 
 导出走的是浏览器原生打印，**打印对话框长什么样由浏览器决定**，页面不接管、也不提供纸张 / 缩放 / 页边距设置。Chrome 与 Edge 直接有「另存为 PDF」；Safari 需要在打印预览左下角点「PDF → 存储为 PDF」。M6b 验收用的就是这条真实路径（真跑 Chromium → 原生打印出 PDF → 用 poppler 工具核验纸张 / 页数 / 中文可提取 / UI 文案未泄漏 / 每页页边距 / PDF 内嵌字体为 Noto）。
 
+### 验证工作描述 AI 优化（M7.1）
+
+AI 功能需要服务端持有 API key，因此比前几个阶段多一步准备。
+
+**准备**：在 `server/.env`（已被 `.gitignore` 覆盖）里写入 `DEEPSEEK_API_KEY=你的真实 key`。该文件不会被提交，也不会进构建产物。
+
+**开发态**（两个进程，分别开一个终端）：
+
+```bash
+npm run dev       # Vite，5173；/api 会转发到 8787
+npm run dev:api   # 最小 Node server，8787
+```
+
+**生产态**（同一个进程同时托管 dist 与 /api）：
+
+```bash
+npm run build
+npm start         # 读取 server/.env；也可直接用环境变量传入 key
+```
+
+然后打开 `/editor/resume_001`，展开「工作经历」：
+
+1. 任一**非空**描述右侧点「AI 优化」→ 该按钮变成「优化中…」，其余 AI 按钮同时变灰（但输入框、删除按钮、其他模块照常可用）
+2. 成功后该行下方出现虚线面板，显示「AI 建议」+ 建议文本 + 「采用」「取消」
+3. 点「采用」→ 输入框与右侧预览立即换成建议文本，稍后自动保存；**刷新后仍是采用后的内容**
+4. 换个描述再试一次，这次点「取消」→ 面板消失，输入框与预览都不变
+5. 把一条描述**清空**→ 它的「AI 优化」按钮变灰（空内容没有可改写的东西）
+6. 验证「不会写错内容」：点「AI 优化」后趁着「优化中…」，立刻改掉那一行的文字；等建议出现再点「采用」→ 应提示「原内容已发生变化，请重新优化。」，**而不是**把建议写到别的行
+7. 验证失败路径：把 `server/.env` 里的 key 改成一个无效值并重启 `dev:api` → 点击后显示「优化失败，请重试。」，输入框与预览都不受影响，按钮恢复可点
+
+**关于额度与限流**：服务端有一个进程级总闸（30 请求 / 分钟），超出的请求返回 429，**前端与其它失败一样显示同一句「优化失败，请重试。」**。这只是防止公开 endpoint 被瞬时刷爆的下限保护，不是配额系统——进程重启即清零，多实例部署时每个实例各有一份独立计数。真正多用户部署时需要重新设计这一层。
+
 ---
 
 ## 技术栈
@@ -231,12 +271,16 @@ M2.4 之后可以这样验证「项目经历 CRUD」成立：
 | 路由 | React Router 7（Declarative / `BrowserRouter`） |
 | 样式 | 普通 CSS 与 CSS Modules |
 | 中文字体 | `@fontsource-variable/noto-sans-sc` / `@fontsource-variable/noto-serif-sc`（自托管，可变字重；按 `unicode-range` 分片，浏览器只取用到的字形） |
+| 服务端（M7.1 起） | 一个最小的 Node 服务（`server/`）：只用 `node:http` / `node:fs` / `node:path` 与全局 `fetch`，**零框架、零数据库、零 AI SDK**。它存在的唯一理由是让 DeepSeek 的 API key 留在服务端，顺带托管 `dist/` |
+| AI provider | DeepSeek（`POST https://api.deepseek.com/chat/completions`，模型 `deepseek-flash`，显式 `thinking: { type: 'disabled' }`）。provider 域名只出现在服务端代码里 |
 
 ### 当前阶段明确不引入
 
-Next.js、Redux、Zustand、Tailwind、shadcn/ui、Material UI / Ant Design、大型表单框架、数据库、ORM、后端服务、Office / Word 相关依赖、Canvas 编辑器、PDF 相关库。
+Next.js、Redux、Zustand、Tailwind、shadcn/ui、Material UI / Ant Design、大型表单框架、数据库、ORM、Office / Word 相关依赖、Canvas 编辑器、PDF 相关库。
 
 这些都是**有意不引入**的。项目遵循一条原则：真正的需求出现之前，不提前引入依赖，也不提前做架构决策。后续阶段确实需要时，再按实际需求单独评估。
+
+> **关于「后端服务」这条**：M0～M6 当时写的是「刻意不引入后端服务」，那时它准确——整个应用是纯静态的，没有任何服务端代码。**从 M7.1 起这条不再成立**：为了不让 AI provider 的密钥进入浏览器（一旦进入就等于公开），引入了一个最小的 Node server boundary，由它持有 key 并转发请求。但边界刻意收得很紧——没有框架、没有数据库、没有用户体系、没有 session，只有一个 API 端点加静态托管；`src/` 下不读任何 secret，客户端环境变量（`VITE_*`）与本项目无关。
 
 ---
 
@@ -245,6 +289,9 @@ Next.js、Redux、Zustand、Tailwind、shadcn/ui、Material UI / Ant Design、�
 ```
 .
 ├── docs/ai-context/          项目规格与长期上下文（正式文档，见下方索引）
+├── server/                   服务端（M7.1 起）：最小可信边界，持有 AI provider 密钥
+│   ├── index.mjs             HTTP 入口：/api 路由 + dist/ 静态托管 + 限流 + 日志边界
+│   └── optimizeWorkBullet.mjs DeepSeek 调用的唯一实现：校验 / 固定 prompt / 清洗 / 数字保护
 ├── index.html
 ├── package.json
 ├── tsconfig.json
@@ -255,6 +302,8 @@ Next.js、Redux、Zustand、Tailwind、shadcn/ui、Material UI / Ant Design、�
     ├── types/resume.ts       Resume 数据结构类型定义
     ├── data/sampleResume.ts  固定中文示例简历数据
     ├── storage/resumeStorage.ts  浏览器持久化边界：整份 Resume 的 LocalStorage 存取
+    ├── ai/                   浏览器侧的 AI 边界（M7.1）
+    │   └── optimizeWorkBullet.ts 只做 POST 同源 /api + 取 suggestion 的 HTTP 客户端
     ├── pages/                页面组件
     │   ├── MyResumesPage.tsx
     │   ├── NewResumePage.tsx
@@ -293,13 +342,16 @@ Next.js、Redux、Zustand、Tailwind、shadcn/ui、Material UI / Ant Design、�
     └── styles/global.css      全局样式，含 @page（A4 / 16mm 18mm）与打印时的外壳重置
 ```
 
-结构保持扁平。`templates/` 是在 M1 出现第一个真实模板需求时才建立的；`components/` 是在 M2.1 出现第一个「不属于某个页面独占」的组件时才建立的。两者都只包含当前实际需要的文件，没有提前划分 `hooks/`、`lib/` 等目录。目录分层随真实需求增长，而不是预先猜测。
+结构保持扁平。`templates/` 是在 M1 出现第一个真实模板需求时才建立的；`components/` 是在 M2.1 出现第一个「不属于某个页面独占」的组件时才建立的；`ai/` 与 `server/` 是在 M7.1 出现第一个「必须由服务端持有密钥」的需求时才建立的。它们都只包含当前实际需要的文件，没有提前划分 `hooks/`、`lib/` 等目录。目录分层随真实需求增长，而不是预先猜测。
 
 职责边界：
 
 - `EditorPage` 持有 `Resume` 状态并负责布局（不拆 Context / store / reducer）。
 - `BasicInfoForm` 只负责受控输入与回调，**不持有 Resume 状态、不自己取数、不做校验**，也不是通用表单系统（没有字段注册表、没有 schema 驱动渲染）。
-- `WorkExperienceForm` 同样只负责受控输入与回调，本轮只覆盖工作经历；它不知道数据从哪来、也不做校验，更不是通用的「Section 编辑器」。
+- `WorkExperienceForm` 同样只负责受控输入与回调，本轮只覆盖工作经历；它不知道数据从哪来、也不做校验，更不是通用的「Section 编辑器」。M7.1 的 AI 优化把它从「纯受控输入」推进到**持有 AI 瞬态状态**（idle / loading / success / error）：这类状态只描述这一屏正在发生什么，不属于简历数据，因此留在组件里；但**网络请求本身不在组件内**——它只调用 `onOptimizeBullet` 这个 prop，由页面决定怎么发。建议在用户点「采用」之前不进 Resume，采用时也只回调既有的 `onChangeBullet`，没有新增写入路径。
+- `ai/optimizeWorkBullet.ts` 是浏览器侧唯一的 HTTP 边界：只发同源相对路径、只取 `suggestion`。它**不认识 provider 域名**，也没有 `AIService` 类、provider 接口、重试框架或通用 API client。
+- `server/optimizeWorkBullet.mjs` 是整个仓库**唯一**出现 provider 域名与密钥的地方。它不认识 HTTP（不写 header、不决定状态码），也不认识 Resume（不 import 前端类型）。prompt、model、`thinking`、输出上限全部固定在服务端，客户端无法覆盖。
+- `server/index.mjs` 是 HTTP 层：`/api/*` 优先路由、`dist/` 静态托管（带路径越界防护与 SPA 回退）、进程级限流、日志边界。它**不是 web framework**——没有路由表、没有中间件栈、没有 body parser 依赖，也不读数据库 / session / cookie。静态托管的越界防线只有一条：**解析后的绝对路径必须仍在 `dist/` 内**，因此 `server/`、`.env`、`.git/` 从结构上就不可能被读到。
 - `EducationExperienceForm` 与 `WorkExperienceForm` 是两套独立实现，没有抽公共组件：职责边界相同（受控输入 + 回调，不持有状态、不取数、不校验），但字段与语义不同。M2 总验收后仍维持两套独立实现，不合并（理由见下方第 7 条决策）。
 - `ProjectExperienceForm` 与前两个同理，是第三套独立实现。字段更少（无城市），进一步说明三类并不完全同构。
 - `SkillsForm` 是第一个**异形**实现：`SkillItem` 只有 `name` / `level` 两个字符串，没有 description 数组，因此它没有描述要点区块，也**没有删除确认**（05 第 11 节的删除保护只针对工作经历、项目经历这类重要内容）。它是全部四个表单中最短的一个。
@@ -404,6 +456,25 @@ export type ResumeSection =
 按 06 第 5 节的复杂度预算，抽象需要至少 2～3 个真实复用场景。四类 Section 的真实编辑形状现在都已出现，M2 也已完成并通过总验收。**经过四类真实 CRUD 实现后，目前仍不为了减少行数而合并成通用 CRUD / ExperienceForm；现有重复保持可控。后续只有出现真实的跨类型共同修改需求时，再重新评估公共层。**重复代码本身就是判断依据。
 
 这条决策与第 1 条（内容与模板分离）方向一致：两者都在避免「为了未来的可能需求，提前制造耦合」。
+
+### 8. AI 密钥不进浏览器，只为这一件事引入服务端
+
+M7.1 起项目不再是纯静态应用：为了调用 AI provider，引入了一个最小的 Node server boundary。
+
+理由只有一条：**API key 一旦进入浏览器就等于公开**——它会出现在构建产物、DevTools 和任何一次抓包里。所以 key 只存在于服务端环境变量，浏览器侧永远只请求同源的 `/api/ai/optimize-work-bullet`，请求体只有 `{ text }` 一个字段。
+
+边界刻意收得很紧，避免它长成一个「后端」：
+
+- 没有框架、数据库、ORM、用户体系、session、cookie；零新增 npm 依赖
+- 只有一个 API 端点 + `dist/` 静态托管；provider 域名只出现在 `server/optimizeWorkBullet.mjs`
+- prompt、模型、`thinking`、输出上限全部固定在服务端，客户端无法覆盖
+- 建议是**瞬态**的：用户点「采用」之前 Resume 与 LocalStorage 都是 0 改动，采用走的也是既有的 `updateWorkBullet`，没有第二条写入路径
+
+并发与额度上故意选了最简单的做法：全组件同时只允许 1 个 AI 请求在途（结构上消灭乱序，因此不需要请求序号或结果丢弃逻辑），服务端另有一个进程级固定窗口总闸（30 请求 / 分钟）。两者都**不是**面向多用户的最终方案，只是当前阶段够用的下限保护；真正多用户部署时需重新设计这两层。
+
+安全边界只有一条：静态托管解析出的绝对路径**必须仍在 `dist/` 内**。`server/`、`server/.env`、`.git/` 因此从结构上就不可能被读到。
+
+正确性边界也只有一条：**绝不写错内容**。采用前重新校验「item 还在 / 下标仍合法 / 内容仍是发请求时那段文字」，任一不成立就提示重新优化，绝不猜位置。
 
 ---
 
