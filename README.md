@@ -19,9 +19,9 @@
 | M4 | 模板切换（共 3 个模板） | **已完成** |
 | M5 | 基础样式（主题色 / 字体 / 密度 / 头像） | **已完成** |
 | M6 | PDF 导出 | **已完成** |
-| M7.1 | 单条工作描述 AI 优化 | **已完成** |
+| M7.1 | 单条工作描述 AI 优化 | **待真实 Provider 验收** |
 
-M0 ~ M6 全部通过，**MVP 正式完成**。M7.1 在 MVP 之后落地。M7.2 及其后的 AI 能力、M8（模板扩展）尚未开始。
+M0 ~ M6 全部通过，**MVP 正式完成**。M7.1 代码实现已落地，真实 DeepSeek 成功调用待补验。M7.2 及其后的 AI 能力、M8（模板扩展）尚未开始。
 
 > M2 已通过验收：基本信息可编辑，教育 / 工作 / 项目 / 技能四类内容可增删改，每个模块可单独显示或隐藏，所有改动实时反映在右侧预览上。M2 当时还没有保存——刷新会回到示例数据，保存与恢复在 M3 完成。
 >
@@ -33,7 +33,7 @@ M0 ~ M6 全部通过，**MVP 正式完成**。M7.1 在 MVP 之后落地。M7.2 �
 
 > M6 已通过验收：**简历能按 A4 打印成 PDF，中文字体不再由用户机器决定**。本阶段分两段落地。M6a 把「保存」从乐观假设改成结果驱动：只有真的写进 LocalStorage 才显示「已保存」，写入失败显示「保存失败」，编辑停止 300ms 后落盘，离开页面立即 flush。M6b 接上导出：工具栏右侧新增「导出 PDF」按钮，点击时先 `await document.fonts.ready` 再调 `window.print()`，交给浏览器原生打印出纸——**没有 PDF 库、没有 Canvas 截图、没有第二次渲染、没有 DOM 克隆、没有服务端 Chromium**。纸张与分页完全交给 CSS：`@page { size: A4; margin: 16mm 18mm }` 负责每页重复的页边距（模板纸面自身的 `padding` 不会跨页重复，所以打印时把纸面宽度 / 最小高度 / 内边距 / 阴影全部归零），三个模板各自补上 `break-inside: avoid-page` 与 `break-after: avoid-page`，保证模块标题不被孤立在页底、条目不被腰斩；左右双栏模板打印时**仍然保持双栏**，不为了分页悄悄退回单栏。中文字体改为自托管（`@fontsource-variable/noto-sans-sc` / `@fontsource-variable/noto-serif-sc`，字体名带 `Variable` 后缀），PDF 里嵌入的是 Noto 本身，而不是各人机器上的苹方 / 宋体。导出按钮**不改数据、不触发保存、不弹二次确认**，它只是把当前预览交给打印；工具栏会提示「打印时请选择『另存为 PDF』，并关闭『页眉和页脚』」。
 
-> M7.1 已通过验收：**工作描述可以逐条请求 AI 改写建议，建议在用户点「采用」之前不会动到任何数据**。每个工作描述输入框旁多了一个「AI 优化」按钮，点击后由**服务端**调用 DeepSeek（模型 `deepseek-flash`，显式关闭思考模式）返回一条改写建议；建议以虚线面板形式展示在那一行下方，用户点「采用」才写回，点「取消」或什么都不做则 Resume 与 LocalStorage 全程 0 改动。为此引入了**一个最小的可信 Node server 边界**：浏览器请求同源的 `POST /api/ai/optimize-work-bullet`，只有 `{ text }` 一个字段；API key 只存在于服务端环境变量，浏览器侧代码与构建产物里都没有 provider 域名与密钥。并发上故意做得很窄——**全组件同时只允许 1 个 AI 请求在途**（请求期间只锁 AI 按钮，输入框与删除照常可用），因此结构上不存在乱序响应，也就不需要请求序号或结果丢弃逻辑。采用前会重新校验「这条 item 还在 / 下标仍合法 / 内容仍是发请求时的那段文字」，任一不成立就提示重新优化而**绝不猜位置**。M7.1 只做这一件事：**没有** AI 对话、整份简历生成、JD 分析、其他 Section 的 AI、流式输出、多 provider、prompt 编辑器或 AI 历史。
+> M7.1 已完成代码实现，除真实 Provider 成功调用外其余验收已通过：**工作描述可以逐条请求 AI 改写建议，建议在用户点「采用」之前不会动到任何数据**。每个工作描述输入框旁多了一个「AI 优化」按钮，点击后由**服务端**调用 DeepSeek（模型 `deepseek-flash`，显式关闭思考模式）返回一条改写建议；建议以虚线面板形式展示在那一行下方，用户点「采用」才写回，点「取消」或什么都不做则 Resume 与 LocalStorage 全程 0 改动。为此引入了**一个最小的可信 Node server 边界**：浏览器请求同源的 `POST /api/ai/optimize-work-bullet`，只有 `{ text }` 一个字段；API key 只存在于服务端环境变量，浏览器侧代码与构建产物里都没有 provider 域名与密钥。并发上故意做得很窄——**全组件同时只允许 1 个 AI 请求在途**（请求期间只锁 AI 按钮，输入框与删除照常可用），因此结构上不存在乱序响应，也就不需要请求序号或结果丢弃逻辑。采用前会重新校验「这条 item 还在 / 下标仍合法 / 内容仍是发请求时的那段文字」，任一不成立就提示重新优化而**绝不猜位置**。M7.1 只做这一件事：**没有** AI 对话、整份简历生成、JD 分析、其他 Section 的 AI、流式输出、多 provider、prompt 编辑器或 AI 历史。
 
 ### M0 交付了什么
 
@@ -169,11 +169,11 @@ npm run dev
 npm run typecheck   # TypeScript 类型检查
 npm run build       # 类型检查 + 生产构建
 npm run preview     # 预览生产构建结果
-npm run dev:api     # 启动服务端（M7.1 起，AI 功能需要；读取 server/.env）
-npm start           # 生产模式：同一个进程托管 dist/ 与 /api
+npm run dev:api     # 启动服务端（M7.1 起，AI 功能需要；从 server/.env 读取 key，该文件必须存在）
+npm start           # 生产模式：同一个进程托管 dist/ 与 /api，key 由运行环境注入（不读 server/.env）
 ```
 
-M0～M6 的功能只用 `npm run dev` 就够。**AI 优化（M7.1）需要同时跑 `dev:api`**，并在 `server/.env` 里配置 `DEEPSEEK_API_KEY`（该文件已被 `.gitignore` 覆盖，见下方「验证工作描述 AI 优化」）。
+M0～M6 的功能只用 `npm run dev` 就够。**AI 优化（M7.1）需要同时跑 `dev:api`**，并在 `server/.env` 里配置 `DEEPSEEK_API_KEY`（该文件已被 `.gitignore` 覆盖，见下方「验证工作描述 AI 优化」）。`dev:api` 要求 `server/.env` **存在**，缺文件会在启动时报错——本地要用 AI 本来就得先建这个文件；生产态不走这条路径（见下）。
 
 ### 验证数据链路确实成立
 
@@ -233,19 +233,23 @@ AI 功能需要服务端持有 API key，因此比前几个阶段多一步准备
 
 **准备**：在 `server/.env`（已被 `.gitignore` 覆盖）里写入 `DEEPSEEK_API_KEY=你的真实 key`。该文件不会被提交，也不会进构建产物。
 
-**开发态**（两个进程，分别开一个终端）：
+注意：Node 的 `--env-file` **不覆盖已存在的环境变量**——如果 shell / IDE 里已经导出了 `DEEPSEEK_API_KEY`，它会盖过 `server/.env` 里的值。改完 key 记得同时确认环境变量，否则会以为改了没生效。
+
+**开发态**（两个进程，分别开一个终端）——key 来自 `server/.env`：
 
 ```bash
 npm run dev       # Vite，5173；/api 会转发到 8787
-npm run dev:api   # 最小 Node server，8787
+npm run dev:api   # 最小 Node server，8787，用 --env-file 显式加载 server/.env
 ```
 
-**生产态**（同一个进程同时托管 dist 与 /api）：
+**生产态**（同一个进程同时托管 dist 与 /api）——key 由**运行环境注入**，服务端读的是 `process.env.DEEPSEEK_API_KEY`：
 
 ```bash
 npm run build
-npm start         # 读取 server/.env；也可直接用环境变量传入 key
+DEEPSEEK_API_KEY=... npm start
 ```
+
+`npm start` **不会**去读 `server/.env`。生产环境请用部署平台的环境变量 / secret 注入，例如 `systemd` 的 `Environment=` / `EnvironmentFile=`、容器 secret、或托管平台的环境变量设置。服务端在**缺少 key 时仍然启动**，只有 AI 端点在请求时返回失败（前端显示「优化失败，请重试。」），其余页面与静态资源不受影响。
 
 然后打开 `/editor/resume_001`，展开「工作经历」：
 
