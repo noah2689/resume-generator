@@ -26,7 +26,9 @@
  * 背景大色块 / 装饰性插画。
  *
  * A4 约束与 Simple 相同：固定宽度 210mm + min-height 297mm，内容超长自然向下增长。
- * 不实现分页（无 @media print、无分页线、无 page-break、无自动压缩），属 M6。
+ * 不实现分页（M5 及之前）：无 @media print、无分页线、无 page-break、无自动压缩。
+ * M6b 补上打印分页规则（见文件末尾）：只拦「一断就读不通」的三处，
+ * 仍然没有分页线、也没有为塞进一页而自动压缩字号。
  */
 
 .paper {
@@ -224,4 +226,36 @@
 .skill {
   font-size: var(--resume-body-size, 12px);
   color: #2b2b2b;
+}
+
+/* ==========================================================================
+   打印分页（M6b）
+
+   与 Simple 同一套判据：只拦「短、且一断就读不通」的三处，
+   **不给整个 .section** 加 break-inside: avoid（长模块会让浏览器
+   在页底留一大片空白再把整块推走，越长越难看）。
+
+     .header         姓名 / 规则线 / 岗位 / 联系方式（.headerTop + .nameBlock
+                     也在这块里，整块 avoid 已经覆盖，不必再单独声明）
+     .sectionTitle   标题 + 左侧色条（.sectionTitle 是 flex，色条是它的子元素，
+                     整块 avoid 保住「标题和色条不会分家」）
+     .entry          一条经历尽量不跨页；条目本身超过一页时 avoid 自动失效
+
+   继续不用 legacy 的 page-break-*，只写 break-*。
+   屏幕渲染路径零改动，全部在 @media print 内。
+   ========================================================================== */
+
+@media print {
+  .header {
+    break-inside: avoid-page;
+    break-after: avoid-page;
+  }
+
+  .sectionTitle {
+    break-after: avoid-page;
+  }
+
+  .entry {
+    break-inside: avoid-page;
+  }
 }

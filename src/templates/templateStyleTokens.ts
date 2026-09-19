@@ -75,22 +75,37 @@ const DEFAULT_THEME_COLOR: ThemeColorToken = 'navy';
 /**
  * 支持的字体 token：2 个（05 §7 要求 2～4 个，取最少）。
  *
- * 只定义白名单与 fallback stack，**不下载、不 embed、不引 webfont、不改 index.html**
- * （04 §7 禁止模板临时引用网络未知字体）。
+ * M6b 起这两个 token **确实对应已安装的自托管字体资产**：
+ * `@fontsource-variable/noto-sans-sc` / `@fontsource-variable/noto-serif-sc`（5.3.0），
+ * 在 `src/main.tsx` 以 `wght.css` 引入，实际 family 名是
+ * `'Noto Sans SC Variable'` / `'Noto Serif SC Variable'`（带 Variable 后缀，
+ * 是 fontsource variable 包的命名，与 token 名不同）。
  *
- * M5 证明的是「style.fontFamily 能稳定控制模板使用哪个白名单 font stack」；
- * 「最终使用哪份可获得、可嵌入、中文不乱码的字体资产」属于 M6 在真实 PDF 环境里解决的问题。
- * 因此浏览器里落到 PingFang SC / Songti SC 等系统 fallback 是可接受的。
+ * 因此 fallback 链的含义变了：M5 时它是**唯一可用的字体**，
+ * 现在它是**字体尚未就绪时的兜底**（font-display: swap 期间、某个 unicode-range
+ * 子集未命中、或资产加载失败）。链尾仍写全系统字体，不假设用户装过 Noto。
+ *
+ * 仍然不做的事：不改 token 名（存量数据里存的就是 `noto-sans-sc` /
+ * `noto-serif-sc`，改名等于迁移）、不加第三个字体、不把字重变成 token
+ * （字重继续由各模板自己的 CSS 决定）、不从网络服务引字体。
  */
 export const SUPPORTED_FONT_FAMILIES = ['noto-sans-sc', 'noto-serif-sc'] as const;
 
 export type FontFamilyToken = (typeof SUPPORTED_FONT_FAMILIES)[number];
 
-/** token → font stack。fallback 链写全，不依赖用户电脑安装 Noto 系列。 */
+/**
+ * token → font stack。
+ *
+ * 首位是本项目自托管的 Noto variable 字体（M6b），后面接系统 fallback 链。
+ * fallback 的顺序按「字形风格最接近」排：sans 走苹方 / 冬青黑 / 雅黑，
+ * serif 走宋体系；链尾的通用族保证任何环境下都不会退化成浏览器默认的
+ * 无中文衬线字体。不依赖用户电脑安装 Noto 系列。
+ */
 const FONT_FAMILY_VALUES: Record<FontFamilyToken, string> = {
   'noto-sans-sc':
-    "'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif",
-  'noto-serif-sc': "'Noto Serif SC', 'Songti SC', 'SimSun', serif",
+    "'Noto Sans SC Variable', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif",
+  'noto-serif-sc':
+    "'Noto Serif SC Variable', 'Songti SC', 'SimSun', serif",
 };
 
 /** 未知 fontFamily 的兜底：现代无衬线。 */

@@ -67,6 +67,9 @@ import styles from './EditorPage.module.css';
  * - 右侧：模板选择 + 样式设置（StyleControls）
  * M6a 阶段：自动保存加防抖与状态显示（保存中… / 已保存 / 保存失败），
  * 并在三栏上方补一条只读的 editor toolbar（简历名称 + 保存状态）。
+ * M6b 阶段：toolbar 右侧加「导出 PDF」按钮（等字体就绪后调原生打印），
+ * 并在三栏上补打印样式（隐藏编辑器 UI、重置纸面尺寸、按模块分页）。
+ * 打印本身不改数据、不写存储，因此 M6b 没有引入任何新的状态。
  *
  * 数据流：
  *
@@ -635,6 +638,34 @@ export default function EditorPage() {
     });
   };
 
+  /**
+   * 导出 PDF（M6b）。
+   *
+   * 就是浏览器原生打印，不做别的：
+   * 用户在系统打印对话框里选「另存为 PDF」，于是「导出」这件事
+   * 完全落在浏览器自己的排版引擎上——不需要 html2canvas / jsPDF 之类的
+   * 二次渲染器，也就不会出现「截图像素化」「中文变方框」「分页要自己算」。
+   *
+   * 唯一的准备动作是等字体：
+   * `document.fonts.ready` 在所有正在加载的字体就绪后才 resolve。
+   * 不等它就直接 print，Chrome 有可能按 fallback 字形排版、把 Noto 的
+   * 字形数据排除在 PDF 之外，结果就是「屏幕上是黑体、导出后是宋体」，
+   * 甚至中文字形缺失。等一下就绪后 PDF 里嵌入的才是真正显示的那份字体。
+   * （字体是本地 woff2，不依赖网络，所以这里不会因为断网卡住。）
+   *
+   * 刻意不做的事：
+   * - **不为了导出强制保存 Resume**。打印读的是当前 DOM，与 LocalStorage 无关；
+   *   顺手写一次盘只会在用户没编辑时凭空产生一次磁盘写入、并把状态文案
+   *   从「未修改」改成「已保存」，误导用户以为发生过修改。
+   * - 不引入「导出中…」状态机 / 进度条：window.print() 是同步阻塞调用，
+   *   弹出系统对话框前没有可展示的中间态。
+   * - 不改路由、不改 Resume、不打开新窗口。
+   */
+  const handleExportPdf = async () => {
+    await document.fonts.ready;
+    window.print();
+  };
+
   // 只读地用一下各 section：有就渲染表单，没有就显示提示。
   // 这里不创建 Section——Section 的新增 / 删除属于之后的任务。
   // 注意：这些查找**不看 visible**。隐藏只影响右侧输出，
@@ -668,7 +699,9 @@ export default function EditorPage() {
   return (
     /*
      * editor toolbar（M6a）：三栏之外、之上的一条很薄的条，只放「简历名称 + 保存状态」。
-     * 刻意**不放**「导出 PDF / 预览」——那是 M6b 的真实按钮，本轮不放假按钮。
+     * M6b 在右侧补上真实的「导出 PDF」按钮与一句打印提示。
+     * 刻意**不放**「预览」按钮：预览就是它下面那块三栏里的 A4 纸面本身，
+     * 再给一个「预览」入口等于指回同一个地方。
      * 也不改全局 App 导航：这是页面级动作，留在页面级。
      */
     <div className={styles.editor}>
@@ -677,6 +710,21 @@ export default function EditorPage() {
         <span className={styles.saveStatus} data-status={saveStatus}>
           {SAVE_STATUS_LABELS[saveStatus]}
         </span>
+
+        {/* 导出失败/不可用的提示留在这里而不是弹窗：不需要用户确认，
+            也不需要落盘，读完即走，因此不进 localStorage、不做 onboarding。 */}
+        <div className={styles.editorActions}>
+          <span className={styles.exportHint}>
+            打印时请选择「另存为 PDF」，并关闭「页眉和页脚」。
+          </span>
+          <button
+            type="button"
+            className={styles.exportButton}
+            onClick={handleExportPdf}
+          >
+            导出 PDF
+          </button>
+        </div>
       </div>
 
       <div className={styles.layout}>

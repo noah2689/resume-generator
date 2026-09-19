@@ -12,7 +12,9 @@
  *   导致整张 A4 横向溢出。
  * - 与 Simple / Business 相同的 A4 约束：固定 210mm 宽 + min-height 297mm，
  *   内容超长自然向下增长。
- * - 不实现分页（无 @media print、无分页线、无 page-break、无自动压缩），属 M6。
+ * - 不实现分页（M5 及之前）：无 @media print、无分页线、无 page-break、无自动压缩。
+ *   M6b 补上打印分页规则（见文件末尾）。**双栏结构在打印时保留**，
+ *   不因为要分页就悄悄退回单栏——那样用户的版面选择会被导出动作改掉。
  *
  * M5 起字号 / 行高 / 间距 / 字体都来自 `<article>` 上的 CSS 自定义属性
  * （由 templateStyleTokens.ts 依 resume.style 解析），本文件不再写死这些值。
@@ -219,4 +221,53 @@
   padding: 1px 0;
   font-size: var(--resume-body-size, 12px);
   color: #2b2b2b;
+}
+
+/* ==========================================================================
+   打印分页（M6b）
+
+   与另外两个模板同一套判据：只拦「短、且一断就读不通」的地方，
+   **不给整个 .section** 加 break-inside: avoid（长模块会让浏览器
+   在页底留一大片空白再把整块推走）。
+
+     .header         姓名 / 头像 / 岗位，整块很短，拆开没有意义
+     .sectionTitle   标题 + 右侧延伸线（::after 是它的生成内容，整块 avoid 保住）
+     .entry          一条经历尽量不跨页
+     .entryTitle     条目标题与它下面的职位 / 时间 / 描述不分家
+
+   ---- 关于双栏（本模板的真正风险点） ----
+
+   .columns 是一个 3fr / 7fr 的 grid，只有一行两列。内容长过一页时，
+   这个 grid **必须**能跨页断开。这里刻意什么都不做——不加
+   break-inside: avoid，也不为了分页把它降级成单栏：
+
+   - 加 avoid 是错的：栏内容通常就超过一页，浏览器只能忽略 avoid，
+     白写；万一没忽略，整份简历会被推到第 2 页起才开始。
+   - 退回单栏是错的：单栏是用户没选过的版式。导出动作不该改版面。
+   - 保持 grid 可断页，靠的是浏览器的分片能力（现代 Chrome 支持网格容器
+     分片）。左栏的 border-right 分隔线会跟着每一页的分片各画一段，
+     这是想要的效果：页与页之间栏分隔依然连续。
+
+   换言之本模板在打印时**只做加规则，不改结构**：
+   上面四条 break-* 规则之外，没有任何 .columns / .sidebar / .main 的改动。
+   继续不用 legacy 的 page-break-*。
+   ========================================================================== */
+
+@media print {
+  .header {
+    break-inside: avoid-page;
+    break-after: avoid-page;
+  }
+
+  .sectionTitle {
+    break-after: avoid-page;
+  }
+
+  .entry {
+    break-inside: avoid-page;
+  }
+
+  .entryTitle {
+    break-after: avoid-page;
+  }
 }

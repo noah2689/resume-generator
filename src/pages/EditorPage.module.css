@@ -21,8 +21,14 @@
  * 未找到简历时的错误状态使用 global.css 中的 .panel 样式，不在此处定义。
  *
  * M6a：在三栏布局之上加了一条只读的 editor toolbar（.editorToolbar），
- * 外面用 .editor 竖排包住「工具栏 + 三栏」。工具栏只放简历名称与保存状态，
- * 不含导出 / 预览按钮（那是 M6b）。三栏内部结构与 M5 完全一致。
+ * 外面用 .editor 竖排包住「工具栏 + 三栏」。工具栏只放简历名称与保存状态。
+ *
+ * M6b：工具栏右侧加「打印提示 + 导出 PDF」动作组（.editorActions），
+ * 并在文件末尾补 @media print —— 打印时把编辑器整页拆掉、只留中间那块纸面。
+ * 屏幕布局（含三栏宽度、sticky 样式栏、Accordion）一律不变：
+ * 所有打印改动都在 @media print 内，不影响非打印渲染路径。
+ *
+ * 三栏内部结构与 M5 完全一致。
  *
  * 已知限制（有意不做）：三栏在窄屏下会挤压中间预览，预览靠 .stage 的横向滚动兜住。
  * 窄屏下中间预览继续依赖横向滚动。本轮布局改动只有两处：
@@ -50,11 +56,15 @@
  *
  * 保存状态用 data-status 属性选择器区分，而不是给四种状态各写一个 class：
  * 状态是同一件事的四个取值，不需要四个类名。
+ *
+ * M6b 起右侧多了「提示 + 导出 PDF」这一组动作（.editorActions 用 margin-left: auto
+ * 推到最右）。因此这里**去掉了原来的 justify-content: space-between**：
+ * 三个子项平均分布会把保存状态推到页面正中、与简历名称脱开。
+ * 现在是「左侧=名称+状态这两个信息」「右侧=全部动作」两段式。
  */
 .editorToolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
   padding: 8px 12px;
   background: var(--color-surface);
@@ -62,7 +72,7 @@
   border-radius: 8px;
 }
 
-/* 简历名称：过长时省略号截断，不把保存状态挤出可视区。 */
+/* 简历名称：过长时省略号截断，不把右侧动作挤出可视区。 */
 .editorTitle {
   min-width: 0;
   overflow: hidden;
@@ -74,7 +84,7 @@
 }
 
 /*
- * 保存状态：低调的辅助文字，紧贴右侧不参与收缩。
+ * 保存状态：低调的辅助文字，紧跟在简历名称后面，不参与收缩。
  * 「保存中…」本身就是足够的反馈，因此不引入 spinner / 图标库。
  */
 .saveStatus {
@@ -89,6 +99,65 @@
  */
 .saveStatus[data-status='error'] {
   color: #b3261e;
+}
+
+/*
+ * toolbar 右侧动作组（M6b）：一句打印提示 + 「导出 PDF」。
+ *
+ * margin-left: auto 是这一组停在最右的原因（也替代了原来 toolbar 上的
+ * space-between，见上方 .editorToolbar 注释）。
+ */
+.editorActions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+/*
+ * 打印提示。
+ *
+ * 用户真正会踩的坑只有两个——在打印对话框里没选「另存为 PDF」、
+ * 以及没关掉浏览器默认勾上的页眉页脚。这两件事都发生在**系统对话框里**，
+ * 页面这边的弹窗 / 引导 / 首次提示都拦不住，所以做法就是一直摆在按钮旁边，
+ * 读一次就够：不进 localStorage、不做 onboarding、不设「已读」状态。
+ */
+.exportHint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/*
+ * 唯一的真实动作按钮。
+ *
+ * 沿用既有色板与圆角，**不新建**按钮设计系统：全站目前只有这一个动作按钮，
+ * 为它抽 token / variant / size 属于过度设计。
+ * 颜色刻意写死深蓝而不是 var(--accent)：--accent 定义在模板的 <article> 上，
+ * 工具栏不在它的继承链里，取不到。按钮配色与「用户选的主题色」本来就无关。
+ */
+.exportButton {
+  flex: none;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: #1f3a5f;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.exportButton:hover {
+  background: #16304f;
+}
+
+/* 键盘可达性：默认 focus 圈在深色按钮上几乎看不见，显式补一个。 */
+.exportButton:focus-visible {
+  outline: 2px solid #1f3a5f;
+  outline-offset: 2px;
 }
 
 .layout {
@@ -205,4 +274,103 @@
 .paperSlot {
   width: fit-content;
   margin: 0 auto;
+}
+
+/* ==========================================================================
+   打印 / PDF 导出（M6b）
+
+   目标只有一个：打印出来的东西**只有简历本身**。
+   屏幕上这一页是「编辑器」，三栏里只有中间那块纸面属于交付物，
+   其余全部（顶栏、工具栏、左栏表单、右栏样式设置）都要退出。
+
+   三条分工，不要混：
+   - 隐藏非交付 UI            → 本段（.editorToolbar / .sidebar / .styleSidebar）
+   - 拆掉屏幕专用布局与纸面装饰 → 本段（.layout / .stage / .paperSlot / article）
+   - 每页纸张与页边距          → global.css 的 @page
+   - 内容在哪儿断页            → 三个模板各自 module.css 的 @media print
+
+   全部规则都写在 @media print 内，因此屏幕渲染路径一个像素都不变。
+   ========================================================================== */
+
+@media print {
+  /*
+   * 编辑器整页容器：屏幕上是 flex 竖排（工具栏在上、三栏在下）。
+   * 打印时要退回普通块级流——否则下面的 .layout 即使改成 block，
+   * 也仍然处在一个 flex 格式化上下文里，行为不可预期。这里先拆外层。
+   */
+  .editor {
+    display: block;
+  }
+
+  /* 编辑器 UI 整体退出：工具栏（连同导出按钮自己）、左栏内容表单、右栏样式栏。 */
+  .editorToolbar,
+  .sidebar,
+  .styleSidebar {
+    display: none;
+  }
+
+  /* 三栏 → 单列块级流，只剩中间那块纸面。 */
+  .layout {
+    display: block;
+  }
+
+  /*
+   * .stage 在屏幕上是一个 overflow-x: auto 的横向滚动容器（纸面比容器宽时靠它滚），
+   * 还留了 32px 底部空隙给滚动条。
+   * 打印时两者都是噪声：滚动容器在分页场景下会把内容裁在自己的边界内，
+   * 底部空隙则会挤出一条尾页空白。
+   */
+  .stage {
+    overflow: visible;
+    padding-bottom: 0;
+  }
+
+  /*
+   * 纸面容器在屏幕上用 fit-content 收缩包裹纸面并居中，打印时两件事都要去掉。
+   * 尤其 width: fit-content 必须干掉：里面的 article 打印时会变成 width: auto，
+   * 而 fit-content 父容器的宽度又是由子内容算出来的——留着它会变成
+   * 「父等子、子等父」的循环，最终按子元素的 max-content 收缩，
+   * 纸面就不会铺满 @page 给出的可印宽度。
+   */
+  .paperSlot {
+    width: auto;
+    margin: 0;
+  }
+
+  /*
+   * 纸面重置（三模板通用）。
+   *
+   * 屏幕上 <article class="paper"> 是一个模拟纸张的盒子：210mm 宽、至少 297mm 高、
+   * 16mm 18mm 内边距、一圈浅阴影，用来在灰底舞台上看出一页纸的边界。
+   * 这四条在打印时全部有害：
+   * - width: 210mm —— @page 已经给了 18mm 左右页边距，可印宽度只有 174mm，
+   *   210mm 的盒子必然横向溢出、右侧内容被裁掉。
+   * - min-height: 297mm —— 强制每份简历至少占满一页，短简历会多印一张空页。
+   * - padding —— 元素内边距只在盒子自己那一页生效；跨页之后第 2 页起不再重复，
+   *   于是「屏幕上的留白」在打印里第 2 页就没了。每页留白必须交给 @page margin。
+   * - box-shadow —— 在纸上只会变成一圈灰边。
+   *
+   * 选择器用 `.paperSlot > :global(article)` 而不是硬编码某个模板的类名：
+   * 三个模板的纸面类名都叫 paper，但它们是各自 module 的局部类名，
+   * 这里匹配的是「纸面容器里那个 article」，与具体模板解耦。
+   */
+  .paperSlot > :global(article) {
+    width: auto;
+    min-height: 0;
+    padding: 0;
+    box-shadow: none;
+
+    /*
+     * 主题色分割线 / 左侧色条 / bullet 记号都是靠背景色画出来的。
+     * 用户打印时「背景图形」默认是关的，关掉之后这些装饰会整片消失，
+     * 简历会退化成没有重点的黑白稿。print-color-adjust: exact 告诉浏览器
+     * 对**这棵子树**保留背景色，不受那个全局开关影响。
+     *
+     * 作用域刻意限制在纸面上，没有写在 :root / body 上：
+     * 全局 exact 会连页面外壳的灰底一起印出来，那是我们正要清掉的东西。
+     * -webkit- 前缀留给 Safari（它的无前缀实现在较新版本才有）。
+     */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 }
