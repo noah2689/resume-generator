@@ -1,0 +1,144 @@
+/**
+ * 样式设置控件样式（M5）
+ *
+ * 只负责控件自身的呈现；宽度与位置由 EditorPage 的 .styleSidebar 决定。
+ * 视觉语言与已有表单块（BasicInfoForm / TemplateSwitcher）保持一致：
+ * 同一套 CSS 变量、同样的圆角、同样的标签与输入框字号。
+ *
+ * 右侧栏只有 280px，因此：
+ * - 主题色用色块 radio（5 个一行放不下就换行），比纯文字更一眼可辨；
+ * - 字体与密度用 <select>，窄栏里比一排 radio 更省空间，也与模板选择控件一致。
+ */
+
+.wrapper {
+  padding: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.title {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+/* 一组设置项（主题色 / 字体 / 密度 / 头像）。 */
+.group {
+  margin-bottom: 14px;
+}
+
+.group:last-child {
+  margin-bottom: 0;
+}
+
+.groupLabel {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* ---------- 主题色：色块 radio ---------- */
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+/*
+ * 用 appearance: none 把原生 radio 本身画成色块：
+ * 无需额外的装饰元素，点击区域与语义都还是原生 radio。
+ * 具体颜色由组件通过内联 style 给出（色值来自 templateStyleTokens.ts）。
+ */
+.swatchInput {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+/* 选中态：在色块外圈套一层与页面同色的空隙 + 一圈描边，不改变色块本身。 */
+.swatchInput:checked {
+  box-shadow:
+    0 0 0 2px var(--color-surface),
+    0 0 0 4px var(--color-text-muted);
+}
+
+.swatchInput:focus-visible {
+  outline: 2px solid var(--color-text-muted);
+  outline-offset: 3px;
+}
+
+.swatchName {
+  font-size: 12px;
+  color: var(--color-text);
+}
+
+/* ---------- 字体 / 密度：select ---------- */
+
+.select {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: #ffffff;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.select:focus {
+  border-color: var(--color-text-muted);
+  outline: none;
+}
+
+/* ---------- 头像开关 ---------- */
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkbox {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.checkboxLabel {
+  font-size: 13px;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+/*
+ * 提示行：用于「当前取值不受支持」与「当前没有头像数据」两种情况。
+ * 只是说明文字，不改变任何数据；不用弹窗、不用 Toast、不建通用错误组件。
+ */
+.hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}

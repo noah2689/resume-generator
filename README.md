@@ -17,7 +17,7 @@
 | M2 | 内容编辑 | **已完成** |
 | M3 | 保存与恢复 | **已完成** |
 | M4 | 模板切换（共 3 个模板） | **已完成** |
-| M5 | 基础样式（主题色 / 字体 / 密度 / 头像） | 未开始 |
+| M5 | 基础样式（主题色 / 字体 / 密度 / 头像） | **已完成** |
 | M6 | PDF 导出 | 未开始 |
 
 M0 ~ M6 全部通过后，才称为 MVP。M7（AI 内容辅助）与 M8（模板扩展）在 MVP 之后。
@@ -26,7 +26,9 @@ M0 ~ M6 全部通过后，才称为 MVP。M7（AI 内容辅助）与 M8（模板
 >
 > M3 已通过验收：编辑后自动把整份 Resume 存进浏览器 LocalStorage，**刷新 / 重新打开后恢复**。没有数据、坏数据、`id` 不符或 `schemaVersion` 不符时，一律回退到示例数据，并且不会删除存储里的旧值。仍然没有后端、数据库与账号。
 >
-> M4 已通过验收：**同一份 Resume 可以在三个模板之间自由切换，内容完全不丢**。三个模板为简约单栏（`simple-single-column`）、商务单栏（`business-single-column`）、左右双栏（`two-column`），在编辑器右侧预览上方切换，切换后刷新仍然是所选模板。切换模板只改变 Resume 上的 `templateId` 这一个字段，不重建 `profile` / `sections` / `style`，也不按模板调整顺序或清理隐藏模块。仍然是「模板少而稳定」：没有缩略图、没有模板选择页、没有模板抽屉。
+> M4 已通过验收：**同一份 Resume 可以在三个模板之间自由切换，内容完全不丢**。三个模板为简约单栏（`simple-single-column`）、商务单栏（`business-single-column`）、左右双栏（`two-column`），在编辑器里切换（M4 时入口在预览区上方，M5 起移入右侧样式栏），切换后刷新仍然是所选模板。切换模板只改变 Resume 上的 `templateId` 这一个字段，不重建 `profile` / `sections` / `style`，也不按模板调整顺序或清理隐藏模块。仍然是「模板少而稳定」：没有缩略图、没有模板选择页、没有模板抽屉。
+>
+> M5 已通过验收：**简历的展示方式可以调整，内容一个字都不变**。右侧样式栏提供 4 项设置——主题色（5 个固定色）、字体（2 套中文组合）、密度（宽松 / 标准 / 紧凑）、显示头像开关；改动实时反映在预览上、自动保存、刷新后恢复。切换模板与调整样式是两件互相独立的事：改样式只重建 `style` 一个对象，`profile` / `sections` / `templateId` 连引用都不变。存储里出现不受支持的取值时（历史数据 / 手改），界面会明确告知并让预览走安全兜底，但**不自动改写数据、不写回存储**（展示层兜底 ≠ 数据迁移）。本轮**没有**头像上传入口、**没有**字体资产下载与嵌入、**没有**打印分页——那些分别属于后续阶段。
 
 ### M0 交付了什么
 
@@ -133,13 +135,15 @@ EditorPage 的 resume state
 以下均为后续阶段内容，当前不存在：
 
 - 模板选择页、模板缩略图、模板抽屉、超过三个模板、模板元数据 / 注册表系统（M8）
-- 右侧样式设置栏、主题色 / 字体 / 密度的切换能力（M5）
+- 主题变体（色 × 模板组合成卡片）、字体资产的下载 / 嵌入 / 子集化（M6 / M8）
+- 头像上传入口：`ResumeProfile.avatar` 字段一直在数据结构里，但当前 UI 不提供上传，只提供「显示 / 不显示」开关
+- 用户自定义颜色 / 字号：主题色是固定 5 色，密度是固定 3 档，不给用户逐个调数值
 - PDF 导出、分页边界（M6）
 - Section 排序、Section 新增 / 删除
 - AI 功能、登录、首页视觉设计
 - 通用 Section 编辑器 / 通用 ExperienceForm（见决策第 7 条，当前刻意不做）
 
-编辑器页当前能做的事有九件：**读取示例数据渲染 A4 预览**、**编辑 5 个基本信息字段**、**增删改工作经历 / 教育经历 / 项目经历（各含每条描述）**、**增删改技能**、**单独显示 / 隐藏任一内容模块**、**在三个模板之间切换**、**把改动自动存进浏览器、刷新后恢复**，所有改动实时反映在右侧预览上。它仍然没有样式设置。
+编辑器页当前支持：**读取示例数据渲染 A4 预览**、**编辑 5 个基本信息字段**、**增删改工作经历 / 教育经历 / 项目经历（各含每条描述）**、**增删改技能**、**单独显示 / 隐藏任一内容模块**、**在三个模板之间切换**、**调整主题色 / 字体 / 密度 / 是否显示头像**、**把改动自动存进浏览器、刷新后恢复**，所有改动实时反映在中间预览上。它仍然没有头像上传入口，也没有导出 PDF。
 
 ---
 
@@ -263,9 +267,12 @@ Next.js、Redux、Zustand、Tailwind、shadcn/ui、Material UI / Ant Design、�
     │   ├── SkillsForm.tsx
     │   ├── SkillsForm.module.css
     │   ├── TemplateSwitcher.tsx         模板选择控件（受控 select，只改 templateId）
-    │   └── TemplateSwitcher.module.css
+    │   ├── TemplateSwitcher.module.css
+    │   ├── StyleControls.tsx            样式设置控件（主题色 / 字体 / 密度 / 显示头像，只改 style）
+    │   └── StyleControls.module.css
     ├── templates/            简历模板与模板分发器（只接收数据，负责排版）
     │   ├── ResumeTemplateRenderer.tsx        分发器：按 templateId 显式 switch 到对应模板
+    │   ├── templateStyleTokens.ts            样式 token → CSS 自定义属性的共享解析（无 UI 依赖）
     │   ├── SimpleSingleColumn.tsx            简约单栏（simple-single-column）
     │   ├── SimpleSingleColumn.module.css
     │   ├── BusinessSingleColumn.tsx          商务单栏（business-single-column）
@@ -291,7 +298,12 @@ Next.js、Redux、Zustand、Tailwind、shadcn/ui、Material UI / Ant Design、�
 - `ResumeTemplateRenderer`（分发器）是预览侧唯一的模板入口：只接收 `resume`，读 `templateId` 后用一个**显式 `switch`** 渲染对应模板，不持状态、不取数、不读存储、不排序、不改数据。它**不是**模板注册中心——没有 id → 组件表、没有模板元数据、没有动态加载。未知 `templateId` 走 `default` 回退到简约单栏，只影响展示，不改数据、不写存储。
 - `SimpleSingleColumn` / `BusinessSingleColumn` / `TwoColumn`（三个模板）都只通过 props 接收数据并渲染，不知道编辑器的存在，也不知道彼此的存在。`visible` 过滤、`order` 排序与空 Section 隐藏是三者一致的行为，差异**全部集中在展示方式**——不引入模板专属数据字段，也不改 Schema。三者共用的 `buildEntries` / `isNonEmpty` / `formatDate` 等 helper **各自留一份，不抽公共 util**（M2 总验收时已确立「有 2~3 个真实复用场景才抽象」，同理适用于模板层）。
 - `TwoColumn` 的列分配（技能与联系方式进左栏，教育 / 工作 / 项目进右栏）是**模板内部的展示规则**，不写进数据、不新增 `layout` / `column` 字段、不重排 `resume.sections`；右栏内部仍然按 `order` 排序。左栏确实没有任何可渲染内容时，正文退回单栏，不保留一条空的窄栏。
-- `TemplateSwitcher` 是受控组件：当前值来自 props，变化时上抛回调，**不持有状态、不读路由、不读存储、不修改 Resume、不自动修复未知 `templateId`**（展示层回退不等于数据迁移）。它只有三个硬编码 option；`TEMPLATE_OPTIONS` 这类模板元数据表属于 M8。
+- `TemplateSwitcher` 是受控组件：当前值来自 props，变化时上抛回调，**不持有状态、不读路由、不读存储、不修改 Resume、不自动修复未知 `templateId`**（展示层回退不等于数据迁移）。它只有三个硬编码 option；`TEMPLATE_OPTIONS` 这类模板元数据表属于 M8。M5 起它与样式设置同处右侧样式栏，因此它的样式从横向工具条改成了竖排块——组件本身一行未改，只是换了摆放位置；原来预览区上方那条 `previewToolbar` 已删除，模板切换**只有一个入口**。
+- `StyleControls` 同样是受控组件：当前值来自 `props.style`，每次改动上抛一个 **`StyleChange` 判别联合**（`themeColor` / `fontFamily` / `density` / `showAvatar` 四个真实字段），**不是通用 path setter**——没有字段名字符串、没有 `keyof` 遍历、没有动态索引。它不持有状态、不读路由、不读写存储、不 import 示例数据、不修改 Resume，也不提供头像输入入口。它额外接收一个 `hasAvatar: boolean`（由 `EditorPage` 计算，只有页面拿得到完整 Resume），用于显示一句说明文字；**即使没有头像数据，开关也不 disabled**——那是一个真实的设置项，只是当前没有内容可供显示。中文标签（深蓝 / 传统衬线 / 宽松 …）留在组件里，不放进 token 模块。
+- `templateStyleTokens.ts` 是三个模板**唯一共用的样式入口**，职责只有「支持集合 + token → 实际 CSS 值」：输入是 `Resume.style` 里的选项名（`navy` / `noto-sans-sc` / `standard`），输出是 6 个 CSS 自定义属性（`--accent` / `--resume-font-family` / `--resume-body-size` / `--resume-line-height` / `--resume-section-gap` / `--resume-item-gap`）。它不持有状态、无副作用、不读存储 / 路由、零 React 依赖、不 import 任何模板，因此既可以被三个模板共用，也可以被测试直接调用。它**不是**样式设置页面的 metadata 系统：中文标签与控件布局属于 `StyleControls`。三个模板各存一份映射等于 5 色 + 2 字体 + 3 密度共 30 个值要手动同步，漏一处就是三个模板显示不一致——这是它被共享、而 `buildEntries` 那类渲染 helper 仍各自留一份的原因。
+- `templateStyleTokens` 对**未知取值一律自兜底**：`storage/resumeStorage.ts` 只确认 `style` 是对象、**不逐字段校验取值**，所以存储里完全可能出现 `density: "tiny"`。三个解析函数因此都**不调用传入值上的任何方法**（不 `.trim()`、不 `.toLowerCase()`），一律用相等比较判断，传入数字 / `null` / 对象时只会「不匹配」而不会抛错，最终落到深蓝 + 无衬线 + 标准档。兜底只影响展示：**不修改 Resume、不写回 storage、不做 migration**（与 M4 未知 `templateId` 同一条原则）。
+- M5 之前的三个模板各自写着一份 `THEME_COLORS` / `FALLBACK_ACCENT`，那三份已删除，主题色 / 字体 / 密度统一由 `getTemplateStyleVariables(resume.style)` 解析成 CSS 自定义属性写在各自 `<article>` 上，再由 `.module.css` 消费。**为什么必须走 CSS 自定义属性**：只把字号设在 `.paper` 上不生效——子元素自己有 `font-size` 声明时父级字号不会覆盖它，密度改了也看不出来；自定义属性会继承，写在一处、全部后代都能 `var()` 消费，正文 / 模块标题 / 条目 / bullet / 技能才会真正跟着密度变。每个 `var()` 都带 fallback 且 fallback 就是标准档的值，因此变量缺失时纸面也不塌。姓名这类模板固有层级字号（26px / 25px / 24px）不随密度变化，比正文大或小的强调字号用 `calc(var(--resume-body-size) ± Npx)` 派生——标准档下与 M5 之前的像素值一致，同时能跟着密度缩放。
+- 头像：三个模板都按 `resume.style.showAvatar === true && isNonEmpty(profile.avatar)` 渲染 `<img>`（复用各模板已有的安全 `isNonEmpty`，**不直接对 `avatar` 调 `.trim()`**——历史存储里可能是 `{"avatar": 123}`，`123.trim()` 会让模板崩溃）。头像的形状与位置属于模板：简约单栏居中在姓名上方，商务单栏与左右双栏在 header 右侧与姓名同一行，靠 `headerTop` 容器成组；姓名与头像都没有时不产生空容器。
 - `SimpleSingleColumn` 的 `visible` 过滤与空 Section 隐藏是 M1 就有的行为——M2.6 没有改模板一行，只是接通了「勾选框 → state → 模板」这条链路。M4 也未改动它：新增两个模板是通过 `ResumeTemplateRenderer` 接入的，原有的简约单栏一行未改。
 
 路由：
@@ -300,7 +312,7 @@ Next.js、Redux、Zustand、Tailwind、shadcn/ui、Material UI / Ant Design、�
 | --- | --- | --- |
 | `/` | 我的简历 | 骨架 |
 | `/new` | 新建简历 | 骨架 |
-| `/editor/:resumeId` | 简历编辑器 | M4：内容可编辑 + 三模板切换 + 实时预览，改动自动保存、刷新后恢复（无样式设置） |
+| `/editor/:resumeId` | 简历编辑器 | M5：内容可编辑 + 三模板切换 + 主题色 / 字体 / 密度 / 头像开关 + 实时预览，改动自动保存、刷新后恢复（无头像上传、无 PDF 导出） |
 
 ---
 
@@ -316,6 +328,8 @@ Next.js、Redux、Zustand、Tailwind、shadcn/ui、Material UI / Ant Design、�
 - 模板不新增专属业务字段，不为模板修改数据结构。
 
 这条承诺在 M4 被真实检验过：三个模板由同一份 Resume 驱动，切换时只新建一个 root 对象（`{ ...resume, templateId }`），`profile` / `sections` / `style` 连引用都不变；往返切换任意次后，内容与最初逐字节一致。
+
+M5 检验的是它的对称面：**调整样式同样不碰内容**。改主题色 / 字体 / 密度 / 头像开关只新建 `{ ...resume, style }`，`profile` / `sections` / `templateId` 连引用都不变，而且渲染结果在去掉内联样式属性后逐字节一致——「改展示方式不改内容」这条承诺在切换模板与调整样式两个方向上都被验证过。
 
 这是整个项目的架构基石。数据只有一份真相来源。
 

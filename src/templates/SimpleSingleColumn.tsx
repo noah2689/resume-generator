@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { Resume, ResumeSection } from '../types/resume';
+import { getTemplateStyleVariables } from './templateStyleTokens';
 import styles from './SimpleSingleColumn.module.css';
 
 /**
@@ -16,26 +17,32 @@ import styles from './SimpleSingleColumn.module.css';
  * - 只实现这一个模板，直接 import 渲染，不建注册中心 / 引擎 / 工厂 / DSL。
  * - A4 纸面属于本模板，外层舞台由 EditorPage 提供。
  * - 不实现分页：纸面宽度固定，内容超长时自然向下增长。
- */
-
-/**
- * 主题色映射。
  *
- * 04 §5 要求「模板内部把 style token 映射成具体色值」。
- * M1 只做最小实现：只覆盖当前示例数据用到的 navy，外加一个兜底色，
- * 让已经存在的 style.themeColor 字段不完全空转。
- *
- * 完整色板、主题切换、主题配置系统属于 M5，本次不实现。
+ * M5 起的样式：
+ * - 主题色 / 字体 / 密度不再由本模板自己决定，改为调用
+ *   `getTemplateStyleVariables(resume.style)`，把结果作为 CSS 自定义属性写在
+ *   `<article>` 上，由本模板的 CSS 逐个消费（见 .module.css 顶部说明）。
+ * - 本模板仍然不解释 token 含义，也不保存任何样式状态。
  */
-const THEME_COLORS: Record<string, string> = {
-  navy: '#1f3a5f',
-};
-
-/** 未知 themeColor 时的兜底色：退化为深灰，保证仍是可读的单色简历。 */
-const FALLBACK_ACCENT = '#333333';
-
 export default function SimpleSingleColumn({ resume }: { resume: Resume }) {
-  const accent = THEME_COLORS[resume.style.themeColor] ?? FALLBACK_ACCENT;
+  const { profile } = resume;
+
+  /**
+   * 是否渲染头像。
+   *
+   * 三个条件同时成立才渲染：
+   *   showAvatar === true（严格等于，历史数据里可能是 "true" 之类的非布尔值）
+   *   avatar 是字符串且非空白（复用本模板已有的安全 isNonEmpty）
+   *
+   * 为什么不直接 `profile.avatar.trim()`：
+   * storage/resumeStorage.ts 只确认 `profile` 是对象，不做逐字段运行时校验，
+   * 因此历史存储里完全可能是 `{"avatar": 123}`。`123.trim()` 会直接让模板崩溃，
+   * 而 isNonEmpty 内部先判断 typeof，非字符串一律当作「没有头像」。
+   *
+   * 形状与尺寸由模板决定（04 §8）：本模板头像居中放在姓名上方。
+   */
+  const showAvatarImage =
+    resume.style.showAvatar === true && isNonEmpty(profile.avatar);
 
   // 按 order 升序；visible 为 false 的不渲染。
   // 注意：先复制再排序，不修改传入的 resume.sections。
@@ -43,8 +50,6 @@ export default function SimpleSingleColumn({ resume }: { resume: Resume }) {
     .filter((section) => section.visible)
     .slice()
     .sort((a, b) => a.order - b.order);
-
-  const { profile } = resume;
 
   // 基本信息：空值不参与拼接，避免出现「上海 ｜ ｜ 138...」这类多余分隔符。
   const contactLine = joinNonEmpty(
@@ -55,9 +60,13 @@ export default function SimpleSingleColumn({ resume }: { resume: Resume }) {
   return (
     <article
       className={styles.paper}
-      style={{ '--accent': accent } as CSSProperties}
+      style={getTemplateStyleVariables(resume.style) as CSSProperties}
     >
       <header className={styles.header}>
+        {showAvatarImage && (
+          // alt 留空：姓名就在旁边以文本呈现，头像属于装饰性重复信息。
+          <img className={styles.avatar} src={profile.avatar} alt="" />
+        )}
         {isNonEmpty(profile.name) && (
           <h1 className={styles.name}>{profile.name.trim()}</h1>
         )}

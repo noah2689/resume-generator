@@ -1,27 +1,31 @@
 /**
  * 模板选择控件样式
  *
- * 只负责控件自身的呈现；位置由 EditorPage 的 previewToolbar 决定。
- * 视觉语言与已有表单块保持一致：同一套 CSS 变量、同样的圆角与字号。
+ * 只负责控件自身的呈现；宽度与位置由 EditorPage 的 .styleSidebar 决定。
+ *
+ * M5 起位置从「预览区上方的工具栏」改为「右侧样式栏」，因此呈现方式也跟着
+ * 从横向小条改为与 StyleControls 一致的竖排设置块：
+ * 同样的内边距、同样的标签字号、select 占满整栏宽度。
  */
 
 .wrapper {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
+  padding: 16px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 8px;
 }
 
 .label {
-  font-size: 13px;
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
   color: var(--color-text-muted);
 }
 
 .select {
-  padding: 5px 8px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 8px;
   border: 1px solid var(--color-border);
   border-radius: 4px;
   background: #ffffff;

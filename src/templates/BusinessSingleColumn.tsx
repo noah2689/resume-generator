@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { Resume, ResumeSection } from '../types/resume';
+import { getTemplateStyleVariables } from './templateStyleTokens';
 import styles from './BusinessSingleColumn.module.css';
 
 /**
@@ -23,25 +24,24 @@ import styles from './BusinessSingleColumn.module.css';
  * 04 第 11 节要求新模板「不修改 Resume Schema、能渲染标准示例数据、
  * 空字段不留奇怪占位、长文本不覆盖其他文本、切换回来内容完全一致」。
  *
+ * M5 起的样式：主题色 / 字体 / 密度统一由 `getTemplateStyleVariables(resume.style)`
+ * 解析成 CSS 自定义属性，写在本模板的 `<article>` 上，再由 .module.css 消费。
+ * 本模板不再保留 THEME_COLORS / FALLBACK_ACCENT（那三份是同一份 style 的重复映射）。
+ *
  * 不实现分页：纸面宽度固定，内容超长时自然向下增长（属 M6）。
  */
-
-/**
- * 主题色映射。
- *
- * 04 §5 要求「模板内部把 style token 映射成具体色值」。
- * 沿用与 Simple 相同的最小映射：只覆盖当前示例数据用到的 navy，外加兜底色。
- * 完整色板 / 主题切换属于 M5，本模板不引入新 token、不引入色板系统。
- */
-const THEME_COLORS: Record<string, string> = {
-  navy: '#1f3a5f',
-};
-
-/** 未知 themeColor 时的兜底色：退化为深灰，保证仍是可读的单色简历。 */
-const FALLBACK_ACCENT = '#333333';
-
 export default function BusinessSingleColumn({ resume }: { resume: Resume }) {
-  const accent = THEME_COLORS[resume.style.themeColor] ?? FALLBACK_ACCENT;
+  const { profile } = resume;
+
+  /**
+   * 是否渲染头像。
+   *
+   * showAvatar 严格等于 true，且 avatar 通过本模板已有的安全 isNonEmpty 判断
+   * （非字符串一律当作没有头像，避免历史数据里 `{"avatar": 123}` 这类值让模板崩溃）。
+   * 形状与尺寸由模板决定（04 §8）：本模板头像靠右，与姓名同一行。
+   */
+  const showAvatarImage =
+    resume.style.showAvatar === true && isNonEmpty(profile.avatar);
 
   // 按 order 升序；visible 为 false 的不渲染。
   // 注意：先复制再排序，不修改传入的 resume.sections。
@@ -50,25 +50,34 @@ export default function BusinessSingleColumn({ resume }: { resume: Resume }) {
     .slice()
     .sort((a, b) => a.order - b.order);
 
-  const { profile } = resume;
-
   // 联系方式逐项展示（商务单栏用分列排布，比单行更清晰）。
   // 空值直接不渲染该项，避免出现「上海 ｜ ｜ 138...」这类多余分隔符。
   const contactItems = [profile.city, profile.phone, profile.email].filter(
     isNonEmpty,
   );
 
+  // 姓名与头像在同一行；两者都没有时不产生空的容器。
+  const hasNameRow = isNonEmpty(profile.name) || showAvatarImage;
+
   return (
     <article
       className={styles.paper}
-      style={{ '--accent': accent } as CSSProperties}
+      style={getTemplateStyleVariables(resume.style) as CSSProperties}
     >
       <header className={styles.header}>
-        {isNonEmpty(profile.name) && (
-          <div className={styles.nameBlock}>
-            <h1 className={styles.name}>{profile.name.trim()}</h1>
-            {/* 短规则线：商务感来源之一，宽度只跟随内容，不横向铺满纸面。 */}
-            <span className={styles.nameRule} />
+        {hasNameRow && (
+          <div className={styles.headerTop}>
+            {isNonEmpty(profile.name) && (
+              <div className={styles.nameBlock}>
+                <h1 className={styles.name}>{profile.name.trim()}</h1>
+                {/* 短规则线：商务感来源之一，宽度只跟随内容，不横向铺满纸面。 */}
+                <span className={styles.nameRule} />
+              </div>
+            )}
+            {showAvatarImage && (
+              // alt 留空：姓名就在左侧以文本呈现，头像属于装饰性重复信息。
+              <img className={styles.avatar} src={profile.avatar} alt="" />
+            )}
           </div>
         )}
         {isNonEmpty(resume.targetRole) && (

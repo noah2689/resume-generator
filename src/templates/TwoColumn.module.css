@@ -13,6 +13,16 @@
  * - 与 Simple / Business 相同的 A4 约束：固定 210mm 宽 + min-height 297mm，
  *   内容超长自然向下增长。
  * - 不实现分页（无 @media print、无分页线、无 page-break、无自动压缩），属 M6。
+ *
+ * M5 起字号 / 行高 / 间距 / 字体都来自 `<article>` 上的 CSS 自定义属性
+ * （由 templateStyleTokens.ts 依 resume.style 解析），本文件不再写死这些值。
+ * 每个 var() 都带 fallback，fallback 即 standard 档位，变量缺失时纸面不塌。
+ *
+ * M5 在此文件内发生的**唯一**像素变化是间距统一到 standard 的定义值：
+ *   .section  14px → 18px
+ *   .entry    11px → 10px
+ * 其余数值在 standard 下与 M5 之前完全一致（强调字号用
+ * calc(var(--resume-body-size) ± Npx) 派生，standard 下仍是 12.5px / 11px）。
  */
 
 .paper {
@@ -24,9 +34,9 @@
 
   background: #ffffff;
   color: #2b2b2b;
-  font-family: var(--font-sans, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif);
-  font-size: 12px;
-  line-height: 1.55;
+  font-family: var(--resume-font-family, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif);
+  font-size: var(--resume-body-size, 12px);
+  line-height: var(--resume-line-height, 1.55);
 
   /* 与另外两个模板相同的单层浅阴影，保持舞台呈现一致。 */
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
@@ -42,6 +52,28 @@
   border-bottom: 2px solid var(--accent);
 }
 
+/*
+ * 姓名与头像同一行：姓名靠左，头像靠右。
+ * 只在两者至少有一个存在时才渲染（见组件里的 hasNameRow）。
+ */
+.headerTop {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+/* 头像：本模板在顶部 header 右侧（尺寸与形状由模板决定，04 §8）。 */
+.avatar {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  /* 即使姓名不存在也把头像留在右侧，不依赖 space-between 的分配。 */
+  margin-left: auto;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center;
+}
+
 .name {
   margin: 0;
   font-size: 24px;
@@ -52,7 +84,7 @@
 
 .targetRole {
   margin: 5px 0 0;
-  font-size: 12px;
+  font-size: var(--resume-body-size, 12px);
   letter-spacing: 0.14em;
   color: #5a5f66;
 }
@@ -82,7 +114,7 @@
 /* ---------- Section（标题 + 延伸细线） ---------- */
 
 .section {
-  margin-bottom: 14px;
+  margin-bottom: var(--resume-section-gap, 18px);
 }
 
 .section:last-child {
@@ -94,7 +126,7 @@
   align-items: center;
   gap: 8px;
   margin: 0 0 8px;
-  font-size: 12px;
+  font-size: var(--resume-body-size, 12px);
   font-weight: 600;
   letter-spacing: 0.08em;
   color: #1a1a1a;
@@ -117,14 +149,14 @@
 }
 
 .contactItem {
-  font-size: 12px;
+  font-size: var(--resume-body-size, 12px);
   color: #5a5f66;
 }
 
 /* ---------- 条目（右栏竖排：标题 / 职位 / 时间 / 描述） ---------- */
 
 .entry {
-  margin-bottom: 11px;
+  margin-bottom: var(--resume-item-gap, 10px);
 }
 
 .entry:last-child {
@@ -133,20 +165,20 @@
 
 .entryTitle {
   margin: 0;
-  font-size: 12.5px;
+  font-size: calc(var(--resume-body-size, 12px) + 0.5px);
   font-weight: 600;
   color: #1a1a1a;
 }
 
 .entrySubtitle {
   margin: 1px 0 0;
-  font-size: 12px;
+  font-size: var(--resume-body-size, 12px);
   color: #4a4f56;
 }
 
 .entryDate {
   margin: 1px 0 0;
-  font-size: 11px;
+  font-size: calc(var(--resume-body-size, 12px) - 1px);
   color: #858b92;
 }
 
@@ -161,7 +193,7 @@
 .bullet {
   position: relative;
   padding-left: 13px;
-  font-size: 12px;
+  font-size: var(--resume-body-size, 12px);
   color: #2b2b2b;
 }
 
@@ -185,6 +217,6 @@
 
 .skill {
   padding: 1px 0;
-  font-size: 12px;
+  font-size: var(--resume-body-size, 12px);
   color: #2b2b2b;
 }

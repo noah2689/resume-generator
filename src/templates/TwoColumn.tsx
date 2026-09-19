@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { Resume, ResumeSection } from '../types/resume';
+import { getTemplateStyleVariables } from './templateStyleTokens';
 import styles from './TwoColumn.module.css';
 
 /**
@@ -35,21 +36,12 @@ import styles from './TwoColumn.module.css';
  * - 不修改 Resume Schema，不新增模板专属字段。
  * - helper 与另外两个模板刻意各留一份（不抽公共 util），理由见 README 决策第 7 条。
  *
+ * M5 起的样式：主题色 / 字体 / 密度统一由 `getTemplateStyleVariables(resume.style)`
+ * 解析成 CSS 自定义属性，写在本模板的 `<article>` 上，再由 .module.css 消费。
+ * 本模板不再保留 THEME_COLORS / FALLBACK_ACCENT（那三份是同一份 style 的重复映射）。
+ *
  * 不实现分页：固定宽度 + min-height，内容超长自然向下增长（属 M6）。
  */
-
-/**
- * 主题色映射。
- *
- * 沿用与另外两个模板相同的最小映射：只覆盖示例数据用到的 navy + 兜底色。
- * 完整色板 / 主题切换属于 M5。
- */
-const THEME_COLORS: Record<string, string> = {
-  navy: '#1f3a5f',
-};
-
-/** 未知 themeColor 时的兜底色。 */
-const FALLBACK_ACCENT = '#333333';
 
 /**
  * 归属判断：哪些 Section 放左栏。
@@ -62,7 +54,17 @@ function isSidebarSection(section: ResumeSection): boolean {
 }
 
 export default function TwoColumn({ resume }: { resume: Resume }) {
-  const accent = THEME_COLORS[resume.style.themeColor] ?? FALLBACK_ACCENT;
+  const { profile } = resume;
+
+  /**
+   * 是否渲染头像。
+   *
+   * showAvatar 严格等于 true，且 avatar 通过本模板已有的安全 isNonEmpty 判断
+   * （非字符串一律当作没有头像，避免历史数据里 `{"avatar": 123}` 这类值让模板崩溃）。
+   * 形状与尺寸由模板决定（04 §8）：本模板头像在顶部 header 右侧。
+   */
+  const showAvatarImage =
+    resume.style.showAvatar === true && isNonEmpty(profile.avatar);
 
   // 统一先做 visible 过滤 + 按 order 排序（复制后排序，不动原数组）。
   // 分栏在排序之后进行，因此每一栏内部都保持 order 顺序。
@@ -78,8 +80,6 @@ export default function TwoColumn({ resume }: { resume: Resume }) {
     (section) => !isSidebarSection(section),
   );
 
-  const { profile } = resume;
-
   // 联系方式不是 Section，不参与 order；这里只做「有值才显示」。
   const contactItems = [profile.city, profile.phone, profile.email].filter(
     isNonEmpty,
@@ -89,14 +89,25 @@ export default function TwoColumn({ resume }: { resume: Resume }) {
   const hasSidebarContent =
     contactItems.length > 0 || sidebarSections.length > 0;
 
+  // 姓名与头像在同一行；两者都没有时不产生空的容器。
+  const hasNameRow = isNonEmpty(profile.name) || showAvatarImage;
+
   return (
     <article
       className={styles.paper}
-      style={{ '--accent': accent } as CSSProperties}
+      style={getTemplateStyleVariables(resume.style) as CSSProperties}
     >
       <header className={styles.header}>
-        {isNonEmpty(profile.name) && (
-          <h1 className={styles.name}>{profile.name.trim()}</h1>
+        {hasNameRow && (
+          <div className={styles.headerTop}>
+            {isNonEmpty(profile.name) && (
+              <h1 className={styles.name}>{profile.name.trim()}</h1>
+            )}
+            {showAvatarImage && (
+              // alt 留空：姓名就在左侧以文本呈现，头像属于装饰性重复信息。
+              <img className={styles.avatar} src={profile.avatar} alt="" />
+            )}
+          </div>
         )}
         {isNonEmpty(resume.targetRole) && (
           <p className={styles.targetRole}>{resume.targetRole.trim()}</p>

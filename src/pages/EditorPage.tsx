@@ -7,12 +7,13 @@ import EducationExperienceForm from '../components/EducationExperienceForm';
 import ProjectExperienceForm from '../components/ProjectExperienceForm';
 import SectionVisibilityControls from '../components/SectionVisibilityControls';
 import SkillsForm from '../components/SkillsForm';
+import StyleControls, { type StyleChange } from '../components/StyleControls';
 import TemplateSwitcher from '../components/TemplateSwitcher';
 import WorkExperienceForm from '../components/WorkExperienceForm';
 import { sampleResume } from '../data/sampleResume';
 import { loadResumeFromStorage, saveResumeToStorage } from '../storage/resumeStorage';
 import ResumeTemplateRenderer from '../templates/ResumeTemplateRenderer';
-import type { Resume } from '../types/resume';
+import type { Resume, ResumeStyle } from '../types/resume';
 import {
   addEducationBullet,
   addEducationItem,
@@ -60,8 +61,10 @@ import styles from './EditorPage.module.css';
  * M2.6 阶段：加入 Section 显示 / 隐藏。
  * M3 阶段：加入 LocalStorage 持久化，刷新后恢复。
  * M4 阶段：加入模板切换（简约单栏 / 商务单栏 / 左右双栏）。
+ * M5 阶段：加入基础样式（主题色 / 字体 / 密度 / 头像显示），并补齐三栏布局。
  * - 左侧：模块显示 + 基本信息 + 工作经历 + 教育经历 + 项目经历 + 技能
- * - 右侧：预览工具栏（模板选择）+ A4 简历预览
+ * - 中间：A4 简历预览
+ * - 右侧：模板选择 + 样式设置（StyleControls）
  *
  * 数据流：
  *
@@ -76,7 +79,8 @@ import styles from './EditorPage.module.css';
  *       ├── 左侧 ProjectExperienceForm 修改 project section 的 items
  *       ├── 左侧 SkillsForm 修改 skills section 的 items
  *       ├── 右侧 TemplateSwitcher 只修改 resume.templateId
- *       └── 右侧 ResumeTemplateRenderer(resume) → 按 templateId 选模板组件
+ *       ├── 右侧 StyleControls 只修改 resume.style 的一个字段
+ *       └── 中间 ResumeTemplateRenderer(resume) → 按 templateId 选模板组件
  *
  *   resume 真正变成新对象 → useEffect → saveResumeToStorage
  *
@@ -90,15 +94,56 @@ import styles from './EditorPage.module.css';
  *   上面那些 edits 仍是纯函数，绝不写 LocalStorage——storage IO 只发生在这里与 resumeStorage 内部。
  * - 预览具体用哪个模板由 ../templates/ResumeTemplateRenderer 决定：
  *   本页只知道「有一个模板渲染器」，不需要认识三个模板组件，切换时也只改 templateId。
+ * - token → 具体 CSS 值的映射由 ../templates/templateStyleTokens 负责：
+ *   本页与 StyleControls 都只搬运选项名，不解释它们代表什么颜色 / 字号。
  * - 简历纸面与排版属于模板组件（SimpleSingleColumn / BusinessSingleColumn / TwoColumn）。
  * - Section 排序属于后续阶段。
  *
  * 已知问题（记录，本阶段不处理）：
- * CRUD、显隐、持久化、模板切换逐步接入后，本文件持续变长。
+ * CRUD、显隐、持久化、模板切换、样式设置逐步接入后，本文件持续变长。
  * **行数本身不是重构触发条件**：M2 总验收后仍决定保持各类型 CRUD 独立，
  * 是否拆出 hook / controller 属于后续按职责单独评估的独立判断，
  * 不在任何单个任务里顺手做，也从不因为「超过某个行数」就自动动手。
  */
+
+/**
+ * 把一个样式改动应用到 style 上（M5）。
+ *
+ * 返回值就是新的 style：**值没有真正改变时返回传入的同一个 style 引用**，
+ * 调用方据此短路（既不新建 root，也不触发写盘与重渲染）。
+ *
+ * 为什么不新开一个 ./styleEdits.ts（其余四套 CRUD 都各自有文件）：
+ * 那四个文件处理的是「按 id 定位单条 + 四层嵌套写回 + 列表增删」，
+ * 而样式是**扁平的单层更新**——只在 style 上改一个字段，没有定位逻辑。
+ * 为了它单开一个文件不增加任何清晰度，所以留在本文件内。
+ *
+ * 这四个分支是四个**真实字段**，不是通用 path setter：
+ * 没有字段名字符串、没有 keyof 遍历、没有动态索引。
+ */
+function applyStyleChange(style: ResumeStyle, change: StyleChange): ResumeStyle {
+  switch (change.field) {
+    case 'themeColor':
+      return style.themeColor === change.value
+        ? style
+        : { ...style, themeColor: change.value };
+
+    case 'fontFamily':
+      return style.fontFamily === change.value
+        ? style
+        : { ...style, fontFamily: change.value };
+
+    case 'density':
+      return style.density === change.value
+        ? style
+        : { ...style, density: change.value };
+
+    case 'showAvatar':
+      return style.showAvatar === change.value
+        ? style
+        : { ...style, showAvatar: change.value };
+  }
+}
+
 export default function EditorPage() {
   const { resumeId } = useParams<{ resumeId: string }>();
 
@@ -430,6 +475,40 @@ export default function EditorPage() {
     });
   };
 
+  /**
+   * 修改样式设置（M5）。
+   *
+   * 与 handleTemplateChange 同构，但落在 `style` 上：
+   * - 只新建 root 与 style 两个对象；profile / sections / templateId 连引用都不变。
+   *   验收判据同样是引用相等：
+   *     next.profile === current.profile
+   *     next.sections === current.sections
+   *     next.templateId === current.templateId
+   * - 值没真正变时 applyStyleChange 返回同一个 style 引用 → 直接 return current，
+   *   不写盘、不重渲染（同值短路）。
+   * - 不按模板调整 style、不给模板注入默认样式、不重建 items。
+   *
+   * 持久化同样不需要额外处理：M3 存的是整份 Resume，这个新 root 会被现有的
+   * useEffect 天然接住，style 自然跟随。因此本函数不碰 LocalStorage。
+   */
+  const handleStyleChange = (change: StyleChange) => {
+    setResume((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const nextStyle = applyStyleChange(current.style, change);
+      if (nextStyle === current.style) {
+        return current;
+      }
+
+      return {
+        ...current,
+        style: nextStyle,
+      };
+    });
+  };
+
   // 只读地用一下各 section：有就渲染表单，没有就显示提示。
   // 这里不创建 Section——Section 的新增 / 删除属于之后的任务。
   // 注意：这些查找**不看 visible**。隐藏只影响右侧输出，
@@ -444,6 +523,21 @@ export default function EditorPage() {
   const skillsSection = resume.sections.find(
     (section) => section.type === 'skills',
   );
+
+  /**
+   * 当前简历是否真的有头像内容。
+   *
+   * 用 typeof 而不是直接 `resume.profile.avatar.trim()`：
+   * storage/resumeStorage.ts 只确认 `profile` 是对象，不做逐字段运行时校验，
+   * 因此历史存储里完全可能是 `{"avatar": 123}`。这里是**判断**，不能抛错。
+   *
+   * 计算放在本页而不是 StyleControls：只有本页拿得到完整 Resume。
+   * StyleControls 只接收这个布尔值，不接收整个 profile——
+   * 它需要知道的是「有没有头像」，而不是简历内容长什么样。
+   */
+  const hasAvatar =
+    typeof resume.profile.avatar === 'string' &&
+    resume.profile.avatar.trim() !== '';
 
   return (
     <div className={styles.layout}>
@@ -516,21 +610,29 @@ export default function EditorPage() {
       </aside>
 
       <div className={styles.previewArea}>
-        {/* 预览工具栏：M4 只放模板切换，位于 A4 舞台上方。
-            这里不提前建立 M5 的右侧样式栏。 */}
-        <div className={styles.previewToolbar}>
-          <TemplateSwitcher
-            templateId={resume.templateId}
-            onChange={handleTemplateChange}
-          />
-        </div>
-
         <div className={styles.stage}>
           <div className={styles.paperSlot}>
             <ResumeTemplateRenderer resume={resume} />
           </div>
         </div>
       </div>
+
+      {/* 右侧样式栏（05 第 2 节）。
+          模板选择从 M4 的预览工具栏**移动**到这里，与主题色 / 字体 / 密度 / 头像
+          放在一起——它们都属于「改展示方式」，而预览区只负责展示结果。
+          M4 那条 .previewToolbar 因此被删除，模板切换仍然只有一个入口。 */}
+      <aside className={styles.styleSidebar}>
+        <TemplateSwitcher
+          templateId={resume.templateId}
+          onChange={handleTemplateChange}
+        />
+
+        <StyleControls
+          style={resume.style}
+          hasAvatar={hasAvatar}
+          onChange={handleStyleChange}
+        />
+      </aside>
     </div>
   );
 }

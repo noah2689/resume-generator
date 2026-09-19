@@ -4,10 +4,20 @@
  * 依据：docs/ai-context/04_TEMPLATE_SYSTEM_SPEC.md
  *
  * 视觉方向：克制、专业、中文商务、低装饰。
- * - 字号 / 行高 / 间距采用 04 §5 中 standard 档位的数值
- *   （body 12 / line-height 1.55 / section gap 18 / item gap 10）。
- * - M1 不实现密度切换，因此这些数值在本阶段是固定值，不做档位映射。
- * - 不实现分页：无 @media print、无分页线、无 page-break、无自动压缩。
+ * - 字号 / 行高 / 间距不在本文件里写死，而是消费 `<article>` 上的 CSS 自定义属性
+ *   （由 templateStyleTokens.ts 依据 resume.style 解析得出）。
+ * - 每个 var() 都带 fallback，且 fallback 就是 standard 档位的值，
+ *   因此即使变量缺失，纸面也仍然是 standard 的样子，不会塌掉。
+ *
+ * 为什么正文与间距必须用 var() 而不是在 .paper 上设一次字号：
+ * 子元素自己有 font-size 声明时，父级字号不会覆盖它，密度改了也看不出来。
+ * 自定义属性会继承，所以在各处 var() 消费才真的让密度生效。
+ *
+ * 各模板固有的层级字号（姓名 26px）不随密度变化；比正文大/小的强调字号
+ * 用 calc(var(--resume-body-size) ± Npx) 派生：standard 下与 M5 之前的像素值
+ * 完全一致，同时能跟着密度一起缩放，不会出现「标题比正文还小」的塌陷。
+ *
+ * 不实现分页：无 @media print、无分页线、无 page-break、无自动压缩。
  */
 
 .paper {
@@ -20,9 +30,9 @@
 
   background: #ffffff;
   color: #2b2b2b;
-  font-family: var(--font-sans, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif);
-  font-size: 12px;
-  line-height: 1.55;
+  font-family: var(--resume-font-family, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif);
+  font-size: var(--resume-body-size, 12px);
+  line-height: var(--resume-line-height, 1.55);
 
   /* 单层极浅阴影，用于在浅灰舞台上区分纸面；不做阴影堆叠。 */
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
@@ -39,6 +49,17 @@
   text-align: center;
 }
 
+/* 头像：本模板居中放在姓名上方（尺寸与形状由模板决定，04 §8）。 */
+.avatar {
+  display: block;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 10px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center;
+}
+
 .name {
   margin: 0;
   font-size: 26px;
@@ -49,28 +70,28 @@
 
 .targetRole {
   margin: 6px 0 0;
-  font-size: 13px;
+  font-size: calc(var(--resume-body-size, 12px) + 1px);
   letter-spacing: 0.12em;
   color: var(--accent);
 }
 
 .contact {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: var(--resume-body-size, 12px);
   color: #666666;
 }
 
 /* ---------- Section ---------- */
 
 .section {
-  margin-top: 18px;
+  margin-top: var(--resume-section-gap, 18px);
 }
 
 .sectionTitle {
   margin: 0 0 10px;
   padding-bottom: 4px;
   border-bottom: 1px solid #e3e6ea;
-  font-size: 13px;
+  font-size: calc(var(--resume-body-size, 12px) + 1px);
   font-weight: 600;
   letter-spacing: 0.1em;
   color: var(--accent);
@@ -79,7 +100,7 @@
 /* ---------- 条目 ---------- */
 
 .entry {
-  margin-bottom: 10px;
+  margin-bottom: var(--resume-item-gap, 10px);
 }
 
 .entry:last-child {
@@ -95,21 +116,21 @@
 
 .entryTitle {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--resume-body-size, 12px);
   font-weight: 600;
   color: #1a1a1a;
 }
 
 .entryDate {
   flex: none;
-  font-size: 12px;
+  font-size: var(--resume-body-size, 12px);
   color: #777777;
   white-space: nowrap;
 }
 
 .entrySubtitle {
   margin: 2px 0 0;
-  font-size: 12px;
+  font-size: var(--resume-body-size, 12px);
   color: #555555;
 }
 
@@ -124,7 +145,7 @@
 .bullet {
   position: relative;
   padding-left: 14px;
-  font-size: 12px;
+  font-size: var(--resume-body-size, 12px);
   color: #2b2b2b;
 }
 
@@ -152,6 +173,6 @@
 }
 
 .skill {
-  font-size: 12px;
+  font-size: var(--resume-body-size, 12px);
   color: #2b2b2b;
 }
